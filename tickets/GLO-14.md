@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:47:33+00:00
+- **snapshot captured:** 2026-06-27T23:58:41+00:00
 
 ## Description
 
@@ -99,52 +99,9 @@ recall convenience must actually fill up. This is the user's explicitly-requeste
 **Rationale.** Today the loop *reads* prior decisions (seeded from `tickets/[Product]` + git) but
 never *writes* new ones, so the memory never grows. Closing the write path is the difference
 between a demo of memory and a system that learns. Highest priority — it is load-bearing for the
-"self-learning judgment layer" story (P2 below) and is the smallest, highest-signal gap.
+self-learning judgment-layer story and is the smallest, highest-signal gap.
 
-### P2 — Moderne / OpenRewrite paid-tier evaluation (recipe-amenable remediation back-end)
-
-**Scope.** Evaluate **Moderne / OpenRewrite** (no free tier — paid) as the deterministic,
-recipe-based mass-refactor back-end ALONGSIDE Codegen: Codegen for NOVEL, judgment-heavy fixes;
-Moderne for RECIPE-AMENABLE mechanical debt (dependency/framework upgrades, broad languages incl.
-Java, which Codegen does not cover). <issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue> already routes its billing-path refactor to Codegen
-and explicitly defers the Moderne evaluation here. Register the Moderne local MCP
-(`mod config agent-tools install`) under `hermes/config.yaml mcp_servers` and pilot one recipe.
-**Rationale.** The Hermes JUDGMENT layer should route each ticket to the right remediation
-back-end; without Moderne, recipe-amenable + Java debt has no autonomous path. Paid-tier, so it is
-an evaluation/decision item, not an unconditional build.
-
-### P3 — Real-Linear-UI demo ending (persistent authenticated Chromium profile)
-
-**Scope.** The P0 ticket-in-browser ending currently renders the **local** `tickets/GLO-NN.md`
-snapshot to a self-contained `file://` HTML because the throwaway container Chromium has no Linear
-session and the live ticket URL hits Linear's **auth wall**. Roll forward the *real* ending: a
-persistent, authenticated Chromium profile (mounted user-data-dir with a saved Linear session, or
-a short OAuth bootstrap) so the recording can end on the **actual Linear ticket page** in the UI.
-**Rationale.** The local-snapshot HTML is honest and reproducible (and the right default), but the
-real-Linear-UI ending is more convincing for the submission. Captured here as the deliberate next
-step rather than fragile session plumbing on the deadline.
-
-### P4 — Host-orchestrator egress confinement via MicroVM (OpenShell Option B)
-
-**Scope.** The P1 egress slice (now built) enforces deny-by-default on the **containerized**
-sub-tools inside the Docker Desktop LinuxKit VM. Confining the **host** Hermes orchestrator's own
-egress requires moving it into a MicroVM (libkrun + Hypervisor.framework) — OpenShell Option B,
-already recorded in `docs/system-design-tradeoffs.md`. Inference stays cloud (no CUDA on Apple
-Silicon); watch the Landlock `best_effort` and `inference.local` mDNS macOS bugs.
-**Rationale.** Strongest confinement, biggest moving-parts/DNS risk — sequenced after the
-load-bearing containerized layer that ships today (An Elegant Puzzle: sequence the hardening).
-
-### P5 — PMF → product loop: real shipped-bet feedback (close the North Star loop)
-
-**Scope.** P4 (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>) ranks opportunities RICE/ICE and records a `shipped` field in
-`recordings/pmf_ledger.json`, but nothing flips `shipped:false → true` from real outcomes yet.
-Wire the actual feedback signal (a shipped bet's measured result) back into the ranking so the
-North Star — **opportunities shipped**, not tickets filed — is computed from reality, grounded in
-real usage + Stripe data.
-**Rationale.** Completes the learning loop the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 slice scaffolded; depends on accumulated
-usage data, so it follows the memory-capture (P1) and remediation (P2) work.
-
-### P6 — Autonomous PR-review loop: HumanLayer PR → Hermes resume → Greptile review → triage (newly discovered)
+### P2 — Autonomous PR-review loop: HumanLayer PR → Hermes resume → Greptile review → triage (newly discovered)
 
 **Scope.** Close the full autonomy loop. When HumanLayer opens a PR, fire a GitHub `pull_request`
 (opened/synchronize) **webhook** into Hermes' existing `hermes webhook` receiver so the orchestrator
@@ -161,6 +118,52 @@ the `policy.yaml` allow-list).
 **Rationale.** Turns the repo from "agents that ship code" into "agents that ship *and review* code"
 — the missing half of an autonomous engineering factory. Sequenced after the memory-capture (P1)
 so review-triage decisions also accumulate into long-lived memory.
+
+### P3 — Real-Linear-UI demo ending (persistent authenticated Chromium profile)
+
+**Scope.** The P0 ticket-in-browser ending currently renders the **local** `tickets/GLO-NN.md`
+snapshot to a self-contained `file://` HTML because the throwaway container Chromium has no Linear
+session and the live ticket URL hits Linear's **auth wall**. Roll forward the *real* ending: a
+persistent, authenticated Chromium profile (mounted user-data-dir with a saved Linear session, or
+a short OAuth bootstrap) so the recording can end on the **actual Linear ticket page** in the UI.
+**Rationale.** The local-snapshot HTML is honest and reproducible (and the right default), but the
+real-Linear-UI ending is more convincing for the submission. Captured here as the deliberate next
+step rather than fragile session plumbing on the deadline.
+
+### P4 — Host-orchestrator egress confinement via MicroVM (OpenShell Option B)
+
+**Scope.** Distinct from — NOT replaced by — the NemoClaw/OpenShell egress that <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P1
+already SHIPPED. P1 confines the **containerized sub-tools** (the sandbox demonstrably refuses a
+non-allow-listed CONNECT). This item confines the **host Hermes orchestrator's OWN egress** — the
+orchestrator runs on the macOS host, *outside* any sandbox — by moving it into a MicroVM (libkrun +
+Hypervisor.framework), OpenShell Option B, already recorded in `docs/system-design-tradeoffs.md`.
+i.e. "now sandbox the brain too," not "sandbox the tools again." Inference stays cloud (no CUDA on
+Apple Silicon); watch the Landlock `best_effort` and `inference.local` mDNS macOS bugs.
+**Rationale.** Strongest confinement, biggest moving-parts/DNS risk — sequenced after the
+load-bearing containerized layer that ships today (An Elegant Puzzle: sequence the hardening).
+
+### P5 — PMF → product loop: real shipped-bet feedback (close the North Star loop)
+
+**Scope.** EXTENDS the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 PMF loop that already SHIPPED (it ranks opportunities RICE/ICE
+and records a `shipped` field in `recordings/pmf_ledger.json`) — but nothing flips
+`shipped:false → true` from real outcomes yet. Wire the actual feedback signal (a shipped bet's
+measured result) back into the ranking so the North Star — **opportunities shipped**, not tickets
+filed — is computed from reality, grounded in real usage + Stripe data.
+**Rationale.** Closes the learning loop the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 slice scaffolded; depends on accumulated
+usage data, so it follows the memory-capture (P1) work.
+
+### P6 — Moderne / OpenRewrite paid-tier evaluation (LOWEST priority — paid, no account yet)
+
+**Scope.** Evaluate **Moderne / OpenRewrite** (no free tier — paid; no account provisioned yet, so
+deliberately last) as the deterministic, recipe-based mass-refactor back-end ALONGSIDE Codegen:
+Codegen for NOVEL, judgment-heavy fixes; Moderne for RECIPE-AMENABLE mechanical debt
+(dependency/framework upgrades, broad languages incl. Java, which Codegen does not cover). <issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue>
+already routes its billing-path refactor to Codegen and explicitly defers the Moderne evaluation
+here. Register the Moderne local MCP (`mod config agent-tools install`) under
+`hermes/config.yaml mcp_servers` and pilot one recipe.
+**Rationale.** The Hermes JUDGMENT layer should route each ticket to the right remediation
+back-end; without Moderne, recipe-amenable + Java debt has no autonomous path. Paid-tier with no
+account yet, so it is a future evaluation/decision item — moved to the end of the backlog.
 
 ---
 
