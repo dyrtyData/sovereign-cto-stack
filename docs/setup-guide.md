@@ -356,7 +356,134 @@ hermes -p cto-architecture cron list           # shows the registered job
 
 ## Phase 4 — PMF research profile + `.mp4` recording
 
-_To be filled in during Phase 4._
+Stands up the second use-case profile (`CTO-Market`, PMF research) coordinating with the
+orchestrator over the **shared single-host Kanban board** (`~/.hermes/kanban.db`, design Q4),
+and the external **Xvfb + ffmpeg** recorder sidecar that captures an autonomous run to
+`recordings/run_<ts>.mp4` for the hackathon submission.
+
+> ⚠️ **Keep the laptop PLUGGED IN with the LID OPEN for any recorded run.** `caffeinate -dimsu`
+> blocks idle sleep, but on battery it cannot beat lid-close sleep — a closed lid will kill the
+> capture + the live agent mid-run. Only you can satisfy this (Manual Prerequisite #5).
+
+### 1. Create the `CTO-Market` PMF profile
+
+```bash
+hermes profile create cto-market --clone \
+  --description "PMF / growth researcher: scrapes the web, cross-references query_cto_knowledge growth/PMF texts, emits a textbook-cited strategic brief, hands off via the shared Kanban board."
+```
+
+`--clone` copies the orchestrator's `config.yaml` (so the profile inherits the `cto_knowledge`
+**and** `linear` MCP bindings), `.env`, SOUL.md, and skills. All profiles share the one
+`~/.hermes/kanban.db` (design Q4) — that is how the orchestrator and the specialists coordinate
+on a single host. Install the repo-tracked identity + skill into the profile home (same
+re-sync pattern as Phase 2 §4 / Phase 3 §2 — the repo is the source of truth; the `~/.hermes`
+copies are not tracked):
+
+```bash
+PROF=~/.hermes/profiles/cto-market
+cp hermes/profiles/cto-market/SOUL.md "$PROF/SOUL.md"          # always-loaded identity slot
+mkdir -p "$PROF/skills/pmf_brief"
+cp hermes/skills/pmf_brief.md "$PROF/skills/pmf_brief/SKILL.md"
+chmod 600 "$PROF/SOUL.md" "$PROF/skills/pmf_brief/SKILL.md"
+hermes -p cto-market mcp list   # cto_knowledge + linear both ✓ enabled (inherited via --clone)
+```
+
+> The PMF SOUL + `pmf_brief` skill carry the **same multi-angle grounding discipline** as the
+> orchestrator and the auditor: decompose the question into dimensions, issue **one
+> `query_cto_knowledge` call per dimension** (problem/solution fit; target customer & sizing;
+> experimentation/validated learning; growth loops), and cite the **union** of the distinct
+> `source_file`s retrieval returns — never one query, never a pre-curated title list.
+
+### 2. Run the PMF research task through the shared Kanban board
+
+`scripts/pmf_kanban_run.sh` drives the full board lifecycle around a PMF run so it is
+deterministic and verifiable — **create (ready) → claim (running) → run the agent → complete
+(done) with a structured handoff** (`--summary` + `--metadata` JSON):
+
+```bash
+bash scripts/pmf_kanban_run.sh "Is there product-market fit for an autonomous AI tech-debt auditor for Series-A engineering teams?"
+```
+
+The `cto-market` agent (pmf_brief skill) scrapes the web, multi-angle-queries
+`query_cto_knowledge`, and writes a textbook-cited strategic brief to
+`recordings/pmf_brief_run_<ts>.md`. The script derives the handoff summary/metadata from the
+brief and closes the task with `kanban complete`, producing a `task_runs` row anyone (the
+orchestrator, a downstream task) can read.
+
+> **Long run — detach it.** A live brief takes several minutes of model + web time. Launch it
+> detached so it survives a closed terminal (and keep the lid open):
+> ```bash
+> ( nohup caffeinate -dimsu bash scripts/pmf_kanban_run.sh "<question>" > recordings/pmf.log 2>&1 < /dev/null & )
+> ```
+> `NO_AGENT=1 bash scripts/pmf_kanban_run.sh` writes a deterministic stub brief instead — it
+> still exercises the full Kanban lifecycle + the citation artifact (useful for CI / a dry run).
+
+Verify the brief artifact (textbook citation) **and** the Kanban handoff:
+
+```bash
+python3 scripts/assert_pmf_run.py    # PASS: brief cites a real corpus *.md; task ready->running->done + handoff row
+```
+
+### 3. Build + start the recorder sidecar
+
+```bash
+docker compose --profile record up -d --build recorder
+docker compose exec -T recorder xdpyinfo -display :99   # display :99 up == healthy
+```
+
+The recorder (`recorder/`) bundles **Xvfb** (virtual X display `:99`), **ffmpeg** (`x11grab`),
+a minimal WM (fluxbox), and **chromium** (the visible browser surface). It runs `idle` to keep
+the display up and HEALTHY; `scripts/record_run.sh` drives capture via `docker exec`. The
+`recordings/` and `graphify-out/` directories are **host bind-mounts** (not named volumes) so
+the host (`ffprobe`, the non-blank frame check, the browser surface source) can read the `.mp4`
+and the `service-graph.html` directly. Both are gitignored.
+
+### 4. Record an autonomous run to `.mp4`
+
+```bash
+bash scripts/run_graphify.sh          # ensure graphify-out/service-graph.html exists (hero surface)
+bash scripts/record_run.sh hero       # default: the Phase-3 tech-debt hero loop
+# or:  bash scripts/record_run.sh pmf "<question>"   # record the PMF research run
+```
+
+`record_run.sh`, in order: (1) brings the recorder up healthy; (2) **paints the visible
+surface onto `:99` BEFORE capture** — for `hero` a browser showing
+`graphify-out/service-graph.html` (the legible `frontend=7` / `checkout=6` coupling graph),
+for `pmf` the PMF brief / research surface; (3) **guards** with a non-blank check (a client
+window must be mapped — never records black); (4) starts ffmpeg
+(`-pix_fmt yuv420p -movflags +faststart`); (5) triggers the chosen agent job; (6) stops the
+recorder **gracefully** (writes `q` to ffmpeg's stdin, then SIGINT — both finalize the moov
+atom); (7) verifies the output.
+
+> **Why a visible surface (review decision):** `x11grab` records PIXELS, so a text-only/headless
+> agent run would record a black frame. The browser graph (hero) or the PMF browser session is
+> rendered onto `:99` first, and `record_run.sh` refuses to start capture if no window is mapped.
+
+> **Long run — detach it** (same as the PMF run; keep the lid open):
+> ```bash
+> ( nohup caffeinate -dimsu env PATH="$HOME/.local/bin:$PATH" RECORD_SECONDS=300 \
+>     bash scripts/record_run.sh hero > recordings/record.log 2>&1 < /dev/null & )
+> ```
+> `NO_AGENT=1 RECORD_SECONDS=10 bash scripts/record_run.sh hero` records the surface only
+> (no live model call) — a fast way to validate the capture pipeline.
+
+Verify the recording (valid container, duration>0, moov present, non-blank mid-run frame):
+
+```bash
+python3 scripts/verify_recording.py recordings/run_hero_<ts>.mp4   # RESULT: PASS
+```
+
+> **Tooling notes (this host):** the recorder image installs `chromium` + `fonts-dejavu`/
+> `fonts-liberation` so the surface text/labels are legible. `service-graph.html` pulls
+> `vis-network` from a CDN — chromium in the container reaches it (the graph renders fully); the
+> page's dark header/legend text alone already makes the frame non-blank if the CDN were
+> unreachable. The non-blank check uses ffmpeg `signalstats`: it reads `YSTDEV` when the build
+> exposes it, else the `YMAX-YMIN` luma range (a flat/black frame ~0; a rendered surface spans
+> wide).
+
+> **Human-gated (manual verification):** play `recordings/run_<ts>.mp4` and confirm it visibly
+> shows the run (1–3 min, hackathon-suitable); read the PMF brief and confirm it is coherent
+> with sensible citations; confirm the laptop stayed plugged in + lid open for the recorded run.
 
 ## Phase 5 — Documentation finalization
 

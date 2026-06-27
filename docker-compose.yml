@@ -62,15 +62,33 @@ services:
     profiles: ["rag"]
 
   # --- Phase 4: Xvfb + ffmpeg recorder sidecar (-> recordings/*.mp4) ---
+  # Bundles Xvfb (virtual X display :99) + ffmpeg (x11grab) + a minimal WM and
+  # browser. Runs `idle` to keep the display up and HEALTHY; scripts/record_run.sh
+  # drives capture via `docker exec` (paint a visible surface -> start -> stop with
+  # graceful q to finalize the moov atom). Because x11grab records PIXELS, a visible
+  # surface (service-graph.html / Linear / the PMF browser) must be painted onto :99
+  # before capture (review decision) — record_run.sh guards with a non-blank check.
+  #
+  # recordings/ and graphify-out/ are HOST bind-mounts (not named volumes) so the
+  # host (ffprobe, the non-blank frame check, the browser surface source) can read
+  # the .mp4 and the service-graph.html directly. Both are gitignored.
   recorder:
-    image: debian:bookworm-slim
-    command: ["sh", "-c", "echo 'recorder stub (wired in Phase 4)'; sleep infinity"]
+    build:
+      context: ./recorder
+    environment:
+      DISPLAY: ":99"
+      SCREEN_W: "1280"
+      SCREEN_H: "720"
+      SCREEN_D: "24"
+      REC_DIR: /recordings
     volumes:
-      - recordings:/recordings
+      - ./recordings:/recordings          # host-readable .mp4 output (gitignored)
+      - ./graphify-out:/graphify-out:ro   # the legible service-graph.html surface
+    # Larger /dev/shm so chromium renders the surface without crashing.
+    shm_size: "512m"
     restart: unless-stopped
     profiles: ["record"]
 
 volumes:
   mem0-data:
   rag-index:
-  recordings:
