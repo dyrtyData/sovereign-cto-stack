@@ -35,14 +35,29 @@ services:
     restart: unless-stopped
 
   # --- Phase 2: local Vector RAG MCP sidecar (query_cto_knowledge) ---
-  # build context rag/ added in Phase 2; image placeholder keeps the stub valid now.
+  # Local Vector MCP: MiniLM embeddings + embedded LanceDB + FastMCP HTTP. On boot
+  # it ingests the mounted corpus into the rag-index volume, then serves the
+  # query_cto_knowledge tool at http://localhost:8080/mcp (bound to Hermes in
+  # hermes/config.yaml). No external key — the embedding model is baked into the image.
   rag-sidecar:
-    image: python:3.12-slim
-    command: ["sh", "-c", "echo 'rag-sidecar stub (wired in Phase 2)'; sleep infinity"]
+    build:
+      context: ./rag
     ports:
-      - "8080:8080"
+      - "${RAG_HOST_PORT:-8080}:8080"
     volumes:
-      - ./corpus:/corpus:ro
+      - ./corpus:/corpus:ro          # converted textbooks (gitignored, host-local)
+      - rag-index:/data              # persisted LanceDB index
+    environment:
+      CORPUS_DIR: /corpus
+      RAG_DB_DIR: /data
+      RAG_PORT: "8080"
+    healthcheck:
+      # /health returns 200 once the server is up (reports chunk/source counts).
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health',timeout=5).status==200 else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     restart: unless-stopped
     profiles: ["rag"]
 
@@ -57,4 +72,5 @@ services:
 
 volumes:
   mem0-data:
+  rag-index:
   recordings:

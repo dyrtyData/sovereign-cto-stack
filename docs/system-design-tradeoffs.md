@@ -75,6 +75,57 @@ Anthropic key. This is captured in the Phase-5 full-build ticket.
 - Second-account "fresh setup" walkthrough (Q4/Q8b).
 - OpenShell/NemoClaw egress hardening on Apple Silicon, incl. `policy.yaml` allow-list shape (Q3).
 
+### Q5 — CTO knowledge RAG: local Vector MCP sidecar; consult before *every* CTO function
+
+The CTO brain is a **local Vector MCP sidecar** (`rag/`) — MiniLM embeddings (all-MiniLM-L6-v2,
+384 dims) over an embedded **LanceDB** index of the converted textbook corpus, served by FastMCP
+over Streamable HTTP, exposing one tool: `query_cto_knowledge`. The agent must consult it
+**before every CTO function** (tech-debt audit, PMF, org/strategy) and cite the returned
+`source_file`(s) — enforced by `hermes/AGENTS.md` rule #1.
+
+**Why this option (vs the alternatives surveyed in research §10):**
+
+- **Chosen — local Vector MCP sidecar:** fully local, **zero external keys** (reuses the same
+  embedding model as the mem0 round-trip), returns **raw cited chunks** the agent can ground
+  on, and binds cleanly to Hermes as an MCP tool. Self-contained: file-based LanceDB means no
+  second DB service on the critical path before EOD June 30.
+- **Discarded — `claude-context` (Zilliz/Milvus cloud):** cloud dependency + an OpenAI embedding
+  key; also disabled in this environment.
+- **Discarded — NotebookLM CLI:** black-box server-side retrieval — no query-ranked chunk access,
+  so the agent cannot cite exact grounding passages.
+- **Discarded — indexed grep/dig-down:** weak recall, no semantic ranking.
+
+These remain **documented future possibilities** but are not built now.
+
+> _Grounded in: *Accelerate* — fast, local feedback loops; and the showcase goal of citable,
+> reproducible reasoning over a black-box service._
+
+**Conversion pipeline (design Q5 / research §15):** docling (PDF, Apple MPS) + pandoc (EPUB —
+docling has no EPUB support), preferring the PDF when both exist (a stable title-slug maps both
+formats to one `corpus/<slug>.md`). OCR is disabled (born-digital books; docling 2.68's bundled
+RapidOCR engine fails to initialize on this host). Output is **gitignored** (copyrighted content
+stays local); the conversion script is tracked.
+
+**Hermes MCP-client gap (recorded so a clean clone reproduces):** Hermes v0.17.0 ships without
+the `mcp` Python SDK, so HTTP MCP binding fails until you
+`uv tool install hermes-agent --with mcp --with python-telegram-bot`.
+
+#### Surfaced "gold-standard" texts per domain (the corpus map)
+
+The corpus the RAG brain indexes, grouped by the CTO function each domain feeds:
+
+| Domain | Texts (cite the converted `source_file`) |
+|---|---|
+| **Architecture / tech-debt** (Phase 3) | *Building Microservices* (Newman), *Software Architecture: The Hard Parts*, *Balancing Coupling in Software Design* (Khononov), *Managing Technical Debt*, *Strategic Monoliths and Microservices*, *Designing Data-Intensive Applications* (Kleppmann) |
+| **Delivery / engineering excellence** | *Accelerate* (Forsgren, Humble, Kim), *Lean Enterprise* |
+| **Growth / PMF** (Phase 4) | *The Lean Product Playbook* (Olsen), *Hacking Growth* (Ellis, Brown), *Trustworthy Online Controlled Experiments* (Kohavi, Tang, Xu), *Lean Enterprise* |
+| **Org design / eng leadership** | *An Elegant Puzzle* (Larson), *The Engineering Executive's Primer* (Larson), *The Manager's Path* (Fournier), *Team Topologies* (Skelton, Pais), *Architecture for Flow* (Kaiser), *Practical Wardley Mapping*, *Zero Distance* |
+| **Agentic / GenAI systems** | *Designing Multi-Agent Systems*, *Agentic Architectural Patterns*, *Generative AI Design Patterns* |
+
+> _Grounded in: *Building Microservices* / *Balancing Coupling* — the architecture audit's
+> primary references; *The Lean Product Playbook* / *Hacking Growth* — the PMF references;
+> *An Elegant Puzzle* / *The Engineering Executive's Primer* — org & strategy._
+
 ## Per-phase findings
 
-_Coupling findings, RAG choices, and refactor reasoning are appended here as Phases 2–4 land._
+_Coupling findings (Phase 3) and refactor reasoning are appended here as Phases 3–4 land._

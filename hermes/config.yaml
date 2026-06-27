@@ -28,6 +28,19 @@ gateway:
     enabled: true
 
 # --- MCP servers ---
-# cto_knowledge (Phase 2) and linear (Phase 3) are added in their phases. Stub kept
-# empty here so the orchestrator config is valid from Phase 1.
-mcp_servers: {}
+# cto_knowledge (Phase 2) is the textbook RAG brain — the local Vector MCP sidecar
+# (docker-compose `rag-sidecar`). It exposes one tool, query_cto_knowledge, which the
+# agent must consult before every CTO function and cite (hermes/AGENTS.md rule #1).
+# It appears to the agent as `mcp_cto_knowledge_query_cto_knowledge`.
+# `linear` (Phase 3) is added in its phase.
+#
+# Apply this to the LIVE config from a clean clone with:
+#   hermes mcp add cto_knowledge --url http://localhost:8080/mcp
+#   hermes mcp configure cto_knowledge      # include: query_cto_knowledge
+# (or copy this block into ~/.hermes/config.yaml and run `hermes mcp list` to confirm).
+mcp_servers:
+  cto_knowledge:
+    url: "http://localhost:8080/mcp"
+    tools:
+      include: [query_cto_knowledge]
+    timeout: 60

@@ -22,6 +22,12 @@ workspaces/
 # Conversion scripts are tracked; their Markdown output is not (review decision).
 corpus/
 
+# === RAG vector index (rebuilt from corpus; never committed) ===
+# Docker uses the `rag-index` named volume; a local `uv run rag/server.py` falls
+# back to rag/.lancedb. Both are generated artifacts.
+.lancedb/
+rag/.lancedb/
+
 # === Python ===
 __pycache__/
 *.pyc

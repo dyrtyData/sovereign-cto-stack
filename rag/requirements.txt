@@ -1,0 +1,6 @@
+# CTO knowledge RAG sidecar — pinned runtime deps (matches the PEP-723 header in server.py).
+# Local, key-free stack: MiniLM embeddings + embedded LanceDB + FastMCP HTTP.
+fastmcp>=3,<4
+lancedb>=0.13
+sentence-transformers>=3,<6
+pyarrow>=15
