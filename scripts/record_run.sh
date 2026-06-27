@@ -131,9 +131,9 @@ log "guard OK: surface is painted"
 log "starting capture -> recordings/$OUT_NAME"
 rexec start "$OUT_NAME"
 
-TICKER_PID=""   # set by start_ticker (defined in step 5); cleared on EXIT
+LIVE_FEED_PID=""   # set by start_heartbeat (defined in step 5); cleared on EXIT
 stop_recorder() {
-  stop_ticker 2>/dev/null || true
+  stop_heartbeat 2>/dev/null || true
   log "stopping capture (graceful q -> finalize moov)"
   rexec stop || true
 }
@@ -146,24 +146,60 @@ trap stop_recorder EXIT
 # the end — that would make the recording look static, the exact failure we fix).
 stream() { stdbuf -oL -eL tee -a "$REPO_ROOT/$AGENT_LOG"; }
 
-# Hermes' one-shot `-z` mode buffers its answer and prints it only at the END, so
-# the left pane would otherwise sit still for most of the run and the recording
-# would read as STATIC (verify_recording's non-static check would, correctly, fail).
-# To keep the pane visibly ALIVE throughout, a background ticker appends a moving
-# progress line every couple of seconds while the agent works; the agent's real
-# reasoning then floods in when it lands. Net effect: the surface CHANGES the whole
-# time, which is both honest (the run is genuinely in progress) and demonstrative.
-start_ticker() {
-  ( i=0
+# P0 (demo authenticity) — sourcing REAL tool-call events.
+# Two facts about Hermes' one-shot `-z` path on this build drive the design:
+#   1. it buffers its answer and prints it only at the END, so $AGENT_LOG (the file
+#      the left pane tails) would otherwise sit still for most of the run and the
+#      recording would read as STATIC; and
+#   2. it does NOT stream genuine per-tool-call lines to any tailable agent.log
+#      (~/.hermes/logs/agent.log and the per-profile logs/agent.log carry only CLI
+#      startup lines for a `-z` run) — so the old "tail the log" source was empty.
+# The authoritative record of real tool calls is instead the per-PROFILE Hermes
+# session store: ~/.hermes/profiles/<profile>/state.db, `messages` table
+# (role='tool', tool_name, timestamp). It is flushed near session end, so we:
+#   - run a 2s recorder HEARTBEAT during the agent run → guarantees the surface keeps
+#     moving (provably non-static), making no fake claims (it is not the old ticker);
+#   - DRAIN the session store after the run and append one real
+#       [live] tool <name> completed
+#     line per GENUINE tool call into $AGENT_LOG. These are the load-bearing proof
+#     that assert_demo_authenticity.py checks (e.g.
+#       [live] tool mcp_cto_knowledge_query_cto_knowledge completed ).
+LIVE_FEED_SINCE=""   # epoch seconds at agent-launch; window for the session-store drain
+start_heartbeat() {
+  LIVE_FEED_SINCE="$(date +%s)"
+  ( n=0
     while :; do
-      i=$((i+1))
-      printf '[%s] %s in progress … (tick %d) — grounding via query_cto_knowledge, surface live\n' \
-        "$(date +%H:%M:%S)" "$1" "$i" >> "$REPO_ROOT/$AGENT_LOG"
+      n=$((n+1))
+      printf '[%s] recorder live — agent running, capturing (elapsed ~%ds)\n' \
+        "$(date +%H:%M:%S)" "$((n*2))" >> "$REPO_ROOT/$AGENT_LOG"
       sleep 2
     done ) &
-  TICKER_PID=$!
+  LIVE_FEED_PID=$!
 }
-stop_ticker() { [ -n "$TICKER_PID" ] && kill "$TICKER_PID" 2>/dev/null || true; TICKER_PID=""; }
+stop_heartbeat() { [ -n "$LIVE_FEED_PID" ] && kill "$LIVE_FEED_PID" 2>/dev/null || true; LIVE_FEED_PID=""; }
+# Drain genuine tool-call rows recorded by THIS run from the profile session store and
+# append them as real `[live] tool <name> completed` lines (timestamp-windowed to this
+# run via LIVE_FEED_SINCE so historical calls are not replayed).
+emit_real_tool_calls() {
+  local db="$1"
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    log "sqlite3 unavailable — cannot drain real tool calls from session store"; return 0
+  fi
+  [ -f "$db" ] || { log "session store not found ($db) — no real tool lines to emit"; return 0; }
+  sleep 1   # let the session-end commit land in state.db
+  local out
+  out="$(sqlite3 "$db" \
+    "SELECT '[live] tool '||COALESCE(NULLIF(tool_name,''),'tool')||' completed' \
+       FROM messages \
+      WHERE role='tool' AND timestamp > ${LIVE_FEED_SINCE:-0} \
+      ORDER BY timestamp;" 2>/dev/null)"
+  if [ -n "$out" ]; then
+    printf '%s\n' "$out" >> "$REPO_ROOT/$AGENT_LOG"
+    log "emitted $(printf '%s\n' "$out" | grep -c 'tool .* completed') real tool-call line(s) from session store"
+  else
+    log "no real tool rows recorded for this run in $db (gate will report this honestly)"
+  fi
+}
 
 if [ "${NO_AGENT:-0}" = "1" ]; then
   log "NO_AGENT=1 — no live model call; driving the log pane with a heartbeat for ${RECORD_SECONDS}s"
@@ -184,24 +220,66 @@ else
       # The auditor reads the coupling graph (visible on the right), multi-angle
       # grounds via query_cto_knowledge, and files the [Brownfield] ticket; its
       # reasoning scrolls live in the left pane via $AGENT_LOG (+ the ticker).
-      start_ticker "tech-debt audit"
+      start_heartbeat
       timeout "$RECORD_SECONDS" "$HERMES" -p cto-architecture -z \
         "Run the tech-debt audit loop: read graphify-out/service-coupling.json, identify the highest-degree coupling hub, GROUND it by issuing MULTIPLE query_cto_knowledge calls (one per dimension: coupling; technical-debt economics/interest; service decomposition & granularity tradeoffs; delivery/throughput performance) and cite the UNION of the distinct source_file(s). Then file ONE HumanLayer-ready [Brownfield] Linear ticket (team 'Global South Ai Safety', labels ['Brownfield'], priority 2) naming the concrete src/<service>/ file(s) with one 'Grounded in:' line per cited source_file. Use the file_brownfield_ticket skill." \
         --skills file_brownfield_ticket --yolo 2>&1 | stream || \
         log "agent job exited non-zero or hit the ${RECORD_SECONDS}s cap (capture still finalized)"
-      stop_ticker
+      emit_real_tool_calls "$HOME/.hermes/profiles/cto-architecture/state.db"
+      stop_heartbeat
       ;;
     pmf)
       log "triggering the PMF research run (cto-market profile) — output streams to the left pane"
       BRIEF="recordings/pmf_brief_run_${TS}.md"
-      start_ticker "PMF research"
+      start_heartbeat
       timeout "$RECORD_SECONDS" "$HERMES" -p cto-market -z \
         "Run the PMF research loop with the pmf_brief skill for this question: \"$PMF_QUESTION\". Scrape the web for current market signal, then GROUND the analysis by issuing MULTIPLE query_cto_knowledge calls (one per dimension: problem/solution fit; target customer & market sizing; experimentation/validated learning; growth loops/acquisition) and cite the UNION of the distinct source_file(s). Write the strategic brief to $BRIEF with one 'Grounded in:' line per cited corpus source_file (at least one real corpus *.md). Print the final summary + metadata JSON." \
         --skills pmf_brief --yolo 2>&1 | stream || \
         log "agent job exited non-zero or hit the ${RECORD_SECONDS}s cap (capture still finalized)"
-      stop_ticker
+      emit_real_tool_calls "$HOME/.hermes/profiles/cto-market/state.db"
+      stop_heartbeat
       ;;
   esac
+fi
+
+# --- 5b. close the file->ticket loop on screen (P0 ending) -------------------
+# While the recorder is STILL CAPTURING, navigate the right pane to the Linear
+# ticket the run just filed so the .mp4 visibly ends on the ticket appearing in the
+# browser. We resolve the newest [Brownfield]/[Product] ticket URL over the same
+# Linear MCP endpoint Hermes uses (read-only). Best-effort: a missing token (e.g.
+# NO_AGENT) or no-ticket-yet simply skips the navigation — the capture still ships.
+if [ "${NO_AGENT:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
+  log "resolving filed ticket URL to navigate the right pane (file->ticket ending)"
+  TICKET_URL="$(JOB="$JOB" python3 - <<'PY' 2>/dev/null || true
+import os, sys
+sys.path.insert(0, "scripts")
+try:
+    import linear_mcp as L
+    L.init()
+    prefix = "[Product]" if os.environ.get("JOB") == "pmf" else "[Brownfield]"
+    res = L.tool("list_issues", {"query": prefix, "team": L.TEAM, "limit": 25})
+    issues = res.get("issues", res) if isinstance(res, dict) else res
+    for i in issues or []:
+        if str(i.get("title", "")).startswith(prefix):
+            ident = i.get("id") or i.get("identifier")
+            full = L.tool("get_issue", {"id": ident})
+            full = full.get("issue", full) if isinstance(full, dict) else full
+            url = (full or {}).get("url") or i.get("url") or ""
+            if url:
+                print(url)
+            break
+except Exception:
+    pass
+PY
+)"
+  if [ -n "$TICKET_URL" ]; then
+    log "navigating right pane to filed ticket: $TICKET_URL"
+    rexec navigate "$TICKET_URL" || log "navigate failed (non-fatal) — capture continues"
+    # hold a few seconds so the ticket page renders into the capture before stop
+    sleep "${TICKET_HOLD_SECONDS:-6}"
+  else
+    log "no filed ticket URL resolved — skipping file->ticket navigation (capture still ships)"
+  fi
 fi
 
 # --- 6. stop the recorder (also runs on trap) --------------------------------
