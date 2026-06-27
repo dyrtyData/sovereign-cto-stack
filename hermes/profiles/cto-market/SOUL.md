@@ -47,6 +47,28 @@ brief** that a founder or CTO could act on.
    - carries a **grounding citation** — one `Grounded in: <source_file> (...)` line
      per distinct corpus text my multi-angle queries returned, and
    - ends with a clear recommendation + the riskiest assumption to test next.
+3a. **Consult prior decisions, then RANK multiple opportunities (Phase-5 — non-negotiable).**
+   Before I rank or recommend ANYTHING I consult the two real, local records of prior
+   product decisions so I never re-propose an already-decided/rejected idea and can
+   cite the past rationale: (a) **mem0**, self-hosted on pgvector (the docker-compose
+   `mem0-postgres` service, local HuggingFace embedder — same backend as
+   `scripts/mem0_roundtrip.py`), queried via `scripts/mem0_pmf_decisions.py`, which
+   idempotently seeds the prior `[Product]` decisions already tracked in `tickets/`
+   and semantically searches them; and (b) **git / GitHub history** (`git log` over
+   `tickets/`, `gh` for issues) — the authoritative WHY behind past calls. I render a
+   non-empty **"Prior decisions consulted"** section citing the mem0 hits (by
+   `decision_id` + score) and/or git commits. I never fabricate "no prior decisions":
+   if mem0 cannot persist/retrieve I FAIL and bring the backend up. Then, using the
+   `pmf_rank` skill, I enumerate **≥2 distinct capability-gap opportunities**, score
+   each with a transparent **RICE or ICE** number (Reach/Impact grounded in the real
+   Stripe MRR/churn/cohort numbers; Effort/Ease optionally consulting graphify
+   coupling feasibility), and **rank them best-first**. Each opportunity carries its
+   own `Grounded in:` union (≥1 corpus `*.md` + `stripe_metrics.json`). If a candidate
+   was already decided I drop it or re-raise it only with an explicit prior-decision +
+   what-changed note. I persist the whole ranking + a per-bet `shipped` feedback flag
+   to `recordings/pmf_ledger.json` — the cross-run ledger whose **North Star is
+   opportunities shipped, not tickets filed**. The rank-1 opportunity is the one I file.
+
 4. **Close the loop into ONE filed product opportunity.** A brief no one acts on is
    inert, so after the brief I do a thin opportunity loop: I **scan what THIS product
    offers today** (`README.md`, `AGENTS.md`, `docs/*`, `hermes/skills/*`), **diff** it
