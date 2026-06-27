@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T17:19:53+00:00
+- **snapshot captured:** 2026-06-27T18:19:12+00:00
 
 ## Description
 
@@ -77,6 +77,19 @@ check, `docker compose config -q`, fresh-clone smoke, Linear find returns this t
 ---
 
 ## Part B — PRIORITIZED deferred backlog (build in this order)
+
+### P0 — Demo video authenticity: stream REAL tool-call events — quick win (do first)
+
+**Scope.** Replace the scripted progress ticker in the recorded run with genuine agent
+activity: tail Hermes' session log / event stream (the real `query_cto_knowledge` and
+`save_issue` tool-call events) into the left split-screen pane as they fire; optionally scroll
+the actual retrieved RAG chunks and show the Linear ticket appearing in the browser at the end.
+Keep the existing non-blank + non-static recording checks. The recorder/split-screen infra
+(`recorder/`, `scripts/record_run.sh`, `scripts/verify_recording.py`) already exists — this is a
+surface swap, not new infrastructure.
+**Rationale.** Competition-relevant: a demo showing real tool calls firing is materially more
+convincing than a ticker, and it's a few-hours change. Small + high-signal → do it BEFORE the
+heavier P1/P2 so the submitted artifact improves immediately.
 
 ### P1 — NemoClaw / OpenShell egress hardening on Apple Silicon (Q3) — competition requirement
 
@@ -161,9 +174,21 @@ data, hence P4.
 * **Second-account "fresh setup" walkthrough (Q4/Q8b).** *Why:* the single-account /
   multiple-profiles topology is what makes the shared Kanban board work (Hermes has no cross-host
   / cross-account coordination primitive); a two-account setup is future-only.
-* **Video authenticity upgrade.** *Why:* the current recording pairs a progress ticker with the
-  real agent output because Hermes' `-z` mode buffers its final answer; streaming real tool-call
-  events from Hermes' session log into the recording is polish, not a blocker.
+
+*(The video authenticity item was promoted to **P0** in Part B — it's competition-relevant and**
+**small, so it's no longer a "someday" deferral.)*
+
+---
+
+## Part D — closeout: author the NEXT full-build epic (recurring)
+
+When this epic's backlog (P0–P4) is substantially actioned — or at the next planning boundary —
+the **final step is to author the next full-build epic (GLO-14)**, mirroring how Phase 5 of the
+original build authored THIS epic (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>). The next epic should: roll forward whatever remains of
+Part C, fold in items discovered while executing P0–P4 (new gaps the auditor / PMF loops surface,
+new competition or product requirements), and re-prioritize. Snapshot it to `tickets/<ID>.md` on
+filing (AGENTS.md rule 7). This keeps the backlog self-perpetuating and git history the
+authoritative, always-current roadmap.
 
 ---
 
@@ -171,7 +196,9 @@ data, hence P4.
 
 - [ ] An engineer (or HumanLayer worktree) can rebuild the entire stack from this ticket + the
       three docs, with no missing step.
-- [ ] The prioritized backlog P1→P4 is actioned in order, each as its own sub-issue when picked up.
-- [ ] P1 (egress hardening) and P2 (Stripe) — the two competition requirements — are tracked as
-      the top of the backlog.
+- [ ] The prioritized backlog P0→P4 is actioned in order, each as its own sub-issue when picked up.
+- [ ] P0 (demo video authenticity) is done first as the quick-win; P1 (egress hardening) and P2
+      (Stripe) — the two competition requirements — follow as the top functional priorities.
 - [ ] Each deferred item states scope + the reason it was deferred (done above).
+- [ ] On closeout, the NEXT full-build epic (GLO-14) is authored (Part D) capturing Part C
+      remainder + newly discovered items, and snapshotted into `tickets/`.
