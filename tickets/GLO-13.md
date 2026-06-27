@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T18:19:12+00:00
+- **snapshot captured:** 2026-06-27T23:35:21+00:00
 
 ## Description
 
@@ -77,6 +77,29 @@ check, `docker compose config -q`, fresh-clone smoke, Linear find returns this t
 ---
 
 ## Part B — PRIORITIZED deferred backlog (build in this order)
+
+**Status (closeout — Phase 6): the P0→P4 backlog is BUILT and gated.** Each slice shipped its own
+`scripts/assert_*.py` gate (exit-0-on-pass) and is committed on the
+`glo-13-full-build-sovereign-cto-stack-complete-vision-all-phases` branch:
+
+- [X] **P0 — Demo video authenticity** — real `agent.tool_executor` tool-call lines stream into the
+      recorded run; `assert_demo_authenticity.py` exits 0. Ending renders the local
+      `tickets/GLO-NN.md` snapshot to a self-contained `file://` HTML (no Linear auth wall).
+- [X] **P1 — Deny-by-default egress** — real NVIDIA OpenShell sandbox enforces `egress/policy.yaml`;
+      `assert_egress_policy.py` exits 0 (negative test load-bearing: a non-allow-listed CONNECT is
+      refused 403; `api.linear.app:443` allowed 200).
+- [X] **P2 — Stripe-grounded AARRR** — `stripe_client.py` reads real test-mode MRR $1,281/mo / 25%
+      churn / 3 cohorts → `recordings/stripe_metrics.json`; the PMF brief grounds Revenue/Retention
+      in it; `assert_stripe_grounding.py` exits 0.
+- [X] **P3 — SonarQube + graphify fusion** — real SonarQube Community scan (240 issues) fused onto
+      `service-coupling.json` as `static_analysis`; <issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue> cites issue `go:S1135` + the degree-6
+      billing-path hub + Codegen back-end; `assert_sonar_fusion.py` exits 0.
+- [X] **P4 — Full ranked PMF loop** — 3 RICE-ranked opportunities + `recordings/pmf_ledger.json`;
+      consults real prior decisions (self-hosted mem0 + git) and does not re-propose <issue id="43187d4c-dfc8-4755-8c0c-4efec4574a4a" href="https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous">GLO-12</issue>;
+      `assert_pmf_ranked.py` exits 0.
+- [X] **Closeout — showcase montage +** <issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-14</issue> — `build_showcase_video.py` ffmpeg-concats the
+      passing segments (hybrid montage, design Q6) into `recordings/showcase_<ts>.mp4`;
+      `assert_showcase_video.py` exits 0; <issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-14</issue> (the next epic) authored + snapshotted.
 
 ### P0 — Demo video authenticity: stream REAL tool-call events — quick win (do first)
 
@@ -183,7 +206,7 @@ data, hence P4.
 ## Part D — closeout: author the NEXT full-build epic (recurring)
 
 When this epic's backlog (P0–P4) is substantially actioned — or at the next planning boundary —
-the **final step is to author the next full-build epic (GLO-14)**, mirroring how Phase 5 of the
+the **final step is to author the next full-build epic (**<issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-14</issue>**)**, mirroring how Phase 5 of the
 original build authored THIS epic (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>). The next epic should: roll forward whatever remains of
 Part C, fold in items discovered while executing P0–P4 (new gaps the auditor / PMF loops surface,
 new competition or product requirements), and re-prioritize. Snapshot it to `tickets/<ID>.md` on
@@ -200,5 +223,5 @@ authoritative, always-current roadmap.
 - [ ] P0 (demo video authenticity) is done first as the quick-win; P1 (egress hardening) and P2
       (Stripe) — the two competition requirements — follow as the top functional priorities.
 - [ ] Each deferred item states scope + the reason it was deferred (done above).
-- [ ] On closeout, the NEXT full-build epic (GLO-14) is authored (Part D) capturing Part C
+- [ ] On closeout, the NEXT full-build epic (<issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-14</issue>) is authored (Part D) capturing Part C
       remainder + newly discovered items, and snapshotted into `tickets/`.

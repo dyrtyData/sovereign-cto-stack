@@ -35,6 +35,18 @@ statically; `scripts/service_topology.py` derives the service-level coupling
 multi-angle-queries the RAG brain and files a HumanLayer-ready `[Brownfield]` Linear ticket
 naming exact `src/<service>/` files with a `Grounded in:` line per cited text (GLO-8/9/10/11).
 
+**P3 augmentation (built — the layered detect→keep→judge→remediate stack).** The audit now fuses
+two complementary static signals: **SonarQube Community (DETECT)** supplies code-quality issues +
+measures (`scripts/sonarqube_client.py` → `graphify-out/sonar-issues.json`; a real scan found 240
+issues — 230 smells / 7 bugs / 3 vulns), and **graphify (KEEP)** supplies the cross-service
+coupling SonarQube has no metric for. `scripts/fuse_signals.py` merges them onto
+`service-coupling.json` as a `static_analysis` block (coupling × issue count, `billing_path` flag,
+an `exemplar_issue`). **Hermes is the JUDGMENT layer**: it prioritizes the **billing path**
+(checkout/payment/currency = revenue surface) and routes the ticket to a remediation back-end —
+**Codegen** for novel multi-file fixes (GLO-16) / **Moderne-OpenRewrite** for recipe-amenable debt.
+`scripts/assert_sonar_fusion.py` gates that GLO-16 cites a real SonarQube issue key + a coupling
+hub + a named back-end.
+
 **Grounding dimensions → texts:**
 
 | Dimension queried | Texts surfaced |
@@ -59,6 +71,20 @@ multi-angle-queries the growth/PMF corpus, writes a textbook-cited strategic bri
 (`recordings/pmf_brief_*.md`), then diffs the brief against what the product offers today and
 files ONE market-informed `[Product]` opportunity ticket (GLO-12). It hands off over the shared
 Kanban board (`kanban_complete()` with summary + metadata) so the orchestrator can act on it.
+
+**P2 grounding (built — real revenue, not assumptions).** The brief's AARRR **Revenue/Retention**
+cells are grounded in **real Stripe test-mode data** — `scripts/stripe_client.py` reads MRR
+($1,281/mo), lifetime churn (25%), and monthly cohort retention into
+`recordings/stripe_metrics.json`, which the brief cites (`Grounded in: stripe_metrics.json`)
+instead of web-scraped competitor pricing. `scripts/assert_stripe_grounding.py` gates it.
+
+**P4 ranking (built — the full PMF loop).** The loop now emits **multiple opportunities ranked
+RICE/ICE** (`recordings/pmf_ledger.json`), each grounded in the corpus + Stripe, with a `shipped`
+feedback field (North Star: opportunities shipped). Before ranking it **consults prior decisions**
+— self-hosted mem0 (pgvector) seeded from the tracked `tickets/[Product]` snapshots + the `git log`
+of `tickets/` — so it does not re-propose an already-decided bet (it correctly drops the GLO-12
+autonomous-remediation idea). `scripts/assert_pmf_ranked.py` gates ≥2 scored, ranked, grounded
+opportunities + a non-empty "Prior decisions consulted" section.
 
 **Grounding dimensions → texts:**
 
@@ -159,15 +185,23 @@ corpus.
 query_cto_knowledge (CTO brain, consulted FIRST — design Q5)
         │  grounds every function below
         ▼
-┌───────────────────────────────────────────────────────────────┐
-│ graphify ── tech-debt audit (fn 1) ──► [Brownfield] Linear ─┐   │
-│ web scrape ─ PMF/strategy (fn 2,3) ──► [Product] Linear ────┤   │
-│ org/delivery reasoning (fn 4,5) ─────► grounded brief ──────┤   │
-└─────────────────────────────────────────────────────────────┘   │
-        │ all coordinate over the shared single-host Kanban board  │
+┌───────────────────────────────────────────────────────────────────────┐
+│ graphify (KEEP) + SonarQube (DETECT) ─ tech-debt (fn 1) ─► [Brownfield] │
+│        └─► Hermes JUDGMENT ─► Codegen / Moderne remediation       Linear│
+│ web scrape + Stripe (real MRR/churn) ─ PMF/strategy (fn 2,3) ─► [Product]│
+│        └─► RICE/ICE-ranked opportunities + prior-decisions consult Linear│
+│ org/delivery reasoning (fn 4,5) ──────────────────► grounded brief      │
+└─────────────────────────────────────────────────────────────────────────┘
+        │ all coordinate over the shared single-host Kanban board · runs captured to .mp4
         ▼                                                          ▼
    git-tracked tickets/<ID>.md  ◄── snapshot_tickets.py    HumanLayer / engineer acts
 ```
+
+> The full P0→P4 backlog that lights up these augmentations (SonarQube fusion, Stripe grounding,
+> ranked PMF, deny-by-default egress, the showcase montage) is built and gated — see
+> [`setup-guide.md`](./setup-guide.md) "Backlog P1–P4 + closeout" and the
+> [decision record](./system-design-tradeoffs.md). The next epic (GLO-14) rolls the remainder
+> forward — see [`../tickets/GLO-14.md`](../tickets/GLO-14.md).
 
 Every filed ticket is snapshotted into the tracked `tickets/<ID>.md` (see
 [`setup-guide.md` → "Ticket tracking"](./setup-guide.md)) so **git history is the authoritative

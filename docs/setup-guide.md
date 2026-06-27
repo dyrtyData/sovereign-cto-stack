@@ -547,6 +547,138 @@ openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
 > against the allow-list. The default stack does not route through it; the sandbox + gate
 > exist to *prove and enforce* the allow-list, and to ship the reviewable `policy.yaml`.
 
+## Backlog P2 — Stripe-grounded AARRR Revenue/Retention
+
+Grounds the PMF brief's AARRR **Revenue/Retention** cells in **real Stripe test-mode** MRR / churn
+/ cohort data instead of web-scraped competitor pricing assumptions (design Q4, Option B). A
+stdlib-only reference client (the `linear_mcp.py` pattern) reads Stripe and writes a JSON artifact
+the brief cites.
+
+> **Prerequisite — a Stripe TEST key.** Put `STRIPE_API_KEY` (a `sk_test_…` / `rk_test_…` key) in
+> `.env`. It is **optional + ungated** (`preflight.sh` is unchanged — the stack runs without it;
+> only the Stripe grounding is unavailable). The client **REFUSES** any `sk_live_`/`rk_live_` key
+> and **fails loudly** (never fabricates) if the key is absent/invalid or the sandbox is empty.
+
+### 1. Seed + read the test-mode sandbox
+
+```bash
+python3 scripts/stripe_seed.py          # idempotent (metadata tag seed:sovereign-cto-stack); TEST-key-guarded
+python3 scripts/stripe_client.py        # -> recordings/stripe_metrics.json {mrr, arr, churn, cohorts[…]}
+```
+
+The fresh sandbox is seeded (12 subscriptions, 3 canceled, 3 monthly cohorts) so MRR/churn/cohorts
+are genuinely real test-mode data: e.g. **MRR $1,281/mo, 25% lifetime churn, cohorts at
+60%/75%/100% retention** (`recordings/stripe_metrics.json`, gitignored).
+
+### 2. Ground the brief + verify
+
+The `pmf_brief` skill reads `recordings/stripe_metrics.json` and grounds the AARRR
+Revenue/Retention cells in it (citing the artifact, preserving the `Grounded in:` lines the gates
+require). The `NO_AGENT=1` stub refreshes the metrics and injects the real numbers.
+
+```bash
+NO_AGENT=1 bash scripts/pmf_kanban_run.sh                 # writes a Stripe-grounded brief
+python3 scripts/assert_stripe_grounding.py                # PASS: Revenue/Retention cite real MRR/churn
+```
+
+## Backlog P3 — SonarQube DETECT + graphify KEEP → Hermes JUDGMENT → Codegen/Moderne
+
+Augments the tech-debt loop with a code-quality signal and a remediation back-end. **SonarQube
+Community (DETECT)** supplies issues/measures; **graphify (KEEP)** supplies cross-service coupling
+(SonarQube has no coupling metric); **Hermes (JUDGMENT)** synthesizes both, prioritizes the
+**billing path**, and files one `[Brownfield]` ticket routed to **Codegen** (novel fixes) or
+**Moderne/OpenRewrite** (recipe-amenable debt).
+
+> **Prerequisite — SonarQube + a scan token.** A profile-gated SonarQube Community service runs in
+> compose (port 9000, H2, ES bootstrap checks disabled). Generate a user token in the SonarQube UI
+> and put it in the gitignored `.sonar-token` (Bearer auth). `CODEGEN_API_KEY` (optional) lives in
+> `.env`. Neither appears in any tracked file (`gitleaks` clean).
+
+### 1. Boot SonarQube + scan the audit target
+
+```bash
+docker compose --profile sonar up -d sonarqube          # community 26.x; healthcheck on /api/system/status
+# scan the gitignored workspaces/microservices-demo clone (Go/Python/JS/C#; Java excluded — needs binaries):
+docker run --rm --network host -v "$PWD/workspaces/microservices-demo:/usr/src" \
+  sonarsource/sonar-scanner-cli -Dsonar.token="$(cat .sonar-token)"
+python3 scripts/sonarqube_client.py                     # -> graphify-out/sonar-issues.json (240 issues here)
+```
+
+`sonarqube_client.py` pulls `/api/issues/search` + `/api/measures/component` (Bearer token) and
+**fails loudly** if SonarQube is unreachable/unscanned (no fabrication).
+
+### 2. Fuse the signals + file the routed ticket + verify
+
+```bash
+python3 scripts/fuse_signals.py                         # merges SonarQube onto service-coupling.json (static_analysis block)
+python3 scripts/assert_graph_topology.py                # PASS: graphify coupling preserved (frontend=7, checkout=6)
+# run the auditor (it now cites a SonarQube issue + a coupling hub + names a back-end), then:
+python3 scripts/assert_sonar_fusion.py                  # PASS: static_analysis block + GLO-16 cites issue+hub+Codegen
+python3 scripts/assert_brownfield_ticket.py             # PASS: multi-angle grounding + src/<service>/ path intact
+```
+
+The fused `static_analysis` block carries the SonarQube totals/measures, a per-service fusion
+(coupling degree × issue count, `billing_path` flag), and an `exemplar_issue` selected on the
+billing-path hub (`src/checkoutservice/main.go`). GLO-16 cites the real issue key, the degree-6
+hub, and **Codegen** on a `Proposed refactor` line (Moderne evaluation → GLO-14).
+
+## Backlog P4 — Full PMF loop: RICE/ICE-ranked opportunities + prior-decisions consult
+
+Extends the thin PMF loop to the full version: **multiple opportunities ranked RICE/ICE**, grounded
+in real usage + Stripe data (P2), with a `shipped`-bet feedback ledger (North Star: opportunities
+shipped). Before ranking it **consults prior decisions** so it neither re-proposes a decided idea
+nor loses past rationale — two real local sources: **self-hosted mem0** (pgvector `mem0-postgres`,
+seeded from the tracked `tickets/[Product]` snapshots) and **git/GitHub history** (`git log` over
+`tickets/`). **No graceful degradation:** if mem0 can't persist/retrieve, the run FAILS rather than
+fabricating "no prior decisions".
+
+```bash
+docker compose up -d mem0-postgres                      # the mem0 backend the consult round-trips
+NO_AGENT=1 bash scripts/pmf_kanban_run.sh               # >=2 RICE-ranked opportunities + recordings/pmf_ledger.json
+python3 scripts/assert_pmf_ranked.py                    # PASS: >=2 scored, ranked, grounded + a non-empty "Prior decisions consulted"
+python3 scripts/assert_pmf_run.py                       # PASS: Kanban created->claimed->completed + handoff invariants
+```
+
+The brief carries a **"Prior decisions consulted"** section citing mem0 hits + git commits; the
+ledger records `rice_score`, `shipped`, and `prior_decisions_consulted`. The loop correctly does
+**not** re-propose the already-decided GLO-12 autonomous-remediation bet.
+
+> **mem0 today writes only the consult/seed path; passive long-lived capture (every run accumulates
+> into the `memories` collection) is the headline GLO-14 item** — see
+> [`../tickets/GLO-14.md`](../tickets/GLO-14.md).
+
+## Closeout — the comprehensive showcase montage (hybrid montage, design Q6)
+
+The submitted demo is a **hybrid montage**: live split-screen captures for the inherently-visual
+hero loops (tech-debt graphify + ticket-in-browser; PMF brief) plus short purpose-built segments
+for the non-visual proofs (denied egress CONNECT, Stripe-grounded AARRR, SonarQube issues, ranked
+PMF). A **simple `ffmpeg concat`** (no editing suite — so it regenerates from a clean clone)
+stitches exactly the segments that pass `verify_recording.py`, with generated title cards between
+them. A missing/failed segment is simply dropped — the automatic best-video-currently-possible
+fallback.
+
+```bash
+# (optional) capture a named segment live onto :99 (each P-slice can emit its own):
+bash scripts/record_run.sh egress-denial                # SEG_LIVE=1 drives the real OpenShell denial
+bash scripts/record_run.sh hero                         # the visual hero loop (real tool calls + ticket-in-browser ending)
+
+# assemble + gate the montage (reads whatever segments/artifacts are present):
+python3 scripts/build_showcase_video.py                 # -> recordings/showcase_<ts>.mp4 (+ showcase_manifest.json)
+python3 scripts/assert_showcase_video.py                # PASS: valid non-static concat + >= the guaranteed hero loop(s)
+```
+
+> **P0 ticket-in-browser ending (fixed here).** The throwaway container Chromium has no Linear
+> session, so navigating to the live ticket URL hit Linear's **auth wall**.
+> `scripts/render_ticket_card.py` renders the tracked local `tickets/<ID>.md` snapshot to a
+> self-contained `file://` HTML, and `record_run.sh` ends the hero capture on **that** page — the
+> filed ticket visible in the browser, no auth. The real-Linear-UI ending (a persistent
+> authenticated Chromium profile) is rolled forward to [GLO-14](../tickets/GLO-14.md).
+
+> **Title cards** are self-contained single-file HTML (`scripts/render_title_card.py`, the
+> `render_service_graph.py` house style) painted onto `:99`; `build_showcase_video.py` renders them
+> to short clips (headless-browser PNG, with an ffmpeg-drawtext fallback) and normalizes every clip
+> to a common WxH/fps/codec so the demuxer concat is safe across heterogeneous sources.
+
 ## End-to-end setup from a clean clone (the full walkthrough)
 
 This section is the single coherent path a new operator follows to bring the whole stack up

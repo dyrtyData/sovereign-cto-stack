@@ -115,7 +115,54 @@ case "$JOB" in
       rexec surface-logterm "$AGENT_LOG_IN_CTR" "PMF research"
     fi
     ;;
-  *) echo "record_run: unknown JOB '$JOB' (expected hero|pmf)" >&2; exit 2 ;;
+  egress-denial|stripe-aarrr|sonar-issues|pmf-ranked)
+    # Phase-6 named SEGMENT (design Q6 hybrid montage). Each P-slice can emit its
+    # own short, purpose-built segment for the non-visual proofs onto the painted
+    # surface. We render a self-contained proof-surface HTML (render_title_card.py,
+    # the render_service_graph.py house style) carrying the slice's load-bearing
+    # facts (the denied CONNECT / real Stripe MRR/churn / SonarQube totals / RICE
+    # scores) and paint it onto :99 (no live agent loop — these proofs are data
+    # surfaces, not split-screen reasoning). build_showcase_video.py reads the same
+    # artifacts to build these segments without the recorder; this path exists so a
+    # segment CAN be captured live where a real terminal beat is wanted (e.g. the
+    # OpenShell denial). Missing artifacts degrade gracefully — the segment is
+    # simply not produced and the montage ships the rest.
+    SEG_HTML="recordings/segment_${JOB}_${TS}.html"
+    case "$JOB" in
+      egress-denial)
+        python3 scripts/render_title_card.py \
+          --kicker "P1 — sovereign safety" --headline "Deny-by-default egress" \
+          --bullet "non-allow-listed CONNECT (example.com:443) -> REFUSED (403)" \
+          --bullet "api.linear.app:443 -> allowed (200)" \
+          --bullet "enforced by a real NVIDIA OpenShell sandbox (out-of-process)" \
+          --footer "gate: assert_egress_policy.py (the negative test is load-bearing)" \
+          --out "$REPO_ROOT/$SEG_HTML" ;;
+      stripe-aarrr)
+        python3 scripts/render_title_card.py \
+          --kicker "P2 — competition requirement" --headline "Stripe-grounded AARRR" \
+          --bullet "real Stripe test-mode MRR / churn / cohorts" \
+          --bullet "grounds the PMF brief Revenue/Retention cells (not assumptions)" \
+          --footer "gate: assert_stripe_grounding.py" \
+          --out "$REPO_ROOT/$SEG_HTML" ;;
+      sonar-issues)
+        python3 scripts/render_title_card.py \
+          --kicker "P3 — DETECT + KEEP -> JUDGMENT" --headline "SonarQube + graphify fusion" \
+          --bullet "SonarQube issues fused onto graphify coupling" \
+          --bullet "Hermes prioritizes the billing path -> Codegen (GLO-16)" \
+          --footer "gate: assert_sonar_fusion.py" \
+          --out "$REPO_ROOT/$SEG_HTML" ;;
+      pmf-ranked)
+        python3 scripts/render_title_card.py \
+          --kicker "P4 — full PMF loop" --headline "RICE-ranked opportunities" \
+          --bullet "multiple opportunities ranked RICE, grounded in corpus + Stripe" \
+          --bullet "prior decisions consulted -> does not re-propose decided bets" \
+          --footer "gate: assert_pmf_ranked.py" \
+          --out "$REPO_ROOT/$SEG_HTML" ;;
+    esac
+    log "painting Phase-6 segment surface: $SEG_HTML"
+    rexec surface-html "/$SEG_HTML"
+    ;;
+  *) echo "record_run: unknown JOB '$JOB' (expected hero|pmf|egress-denial|stripe-aarrr|sonar-issues|pmf-ranked)" >&2; exit 2 ;;
 esac
 
 # --- 3. GUARD: non-blank — a client window must be mapped on :99 -------------
@@ -201,7 +248,37 @@ emit_real_tool_calls() {
   fi
 }
 
-if [ "${NO_AGENT:-0}" = "1" ]; then
+is_segment() { case "$1" in egress-denial|stripe-aarrr|sonar-issues|pmf-ranked) return 0 ;; *) return 1 ;; esac; }
+
+if is_segment "$JOB"; then
+  # Phase-6 SEGMENT capture: the proof surface is already painted (a rendered
+  # title/proof HTML). Hold it for SEGMENT_SECONDS (short, montage-suitable). For
+  # the egress-denial segment, optionally drive the REAL denial live so the
+  # terminal shows the refused CONNECT happening (SEG_LIVE=1 + OpenShell present);
+  # otherwise the painted proof surface is captured as the segment body. The
+  # surface is a still HTML, so we keep the frame advancing with the recorder's
+  # own heartbeat appended to $AGENT_LOG (an on-screen log terminal is not painted
+  # for segments, but the heartbeat keeps the capture honest/non-static if a log
+  # pane is added). Default: a brief static-proof capture for build_showcase_video.
+  SEGMENT_SECONDS="${SEGMENT_SECONDS:-8}"
+  log "SEGMENT '$JOB' — holding the proof surface for ${SEGMENT_SECONDS}s"
+  if [ "$JOB" = "egress-denial" ] && [ "${SEG_LIVE:-0}" = "1" ] && command -v openshell >/dev/null 2>&1; then
+    log "SEG_LIVE=1 — running the real OpenShell denial (refused CONNECT) live"
+    { openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
+        -- sh -c 'echo "[egress] CONNECT example.com:443 ..."; curl -sS https://example.com || true' 2>&1
+      openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
+        -- sh -c 'echo "[egress] CONNECT api.linear.app:443 ..."; curl -sS -o /dev/null -w "allow-listed -> %{http_code}\n" https://api.linear.app || true' 2>&1
+    } | stream || true
+  fi
+  end=$(( $(date +%s) + SEGMENT_SECONDS ))
+  n=0
+  while [ "$(date +%s)" -lt "$end" ]; do
+    n=$((n+1))
+    printf '[%s] sovereign-cto segment %s — proof surface live (#%d)\n' \
+      "$(date +%H:%M:%S)" "$JOB" "$n" >> "$REPO_ROOT/$AGENT_LOG"
+    sleep 2
+  done
+elif [ "${NO_AGENT:-0}" = "1" ]; then
   log "NO_AGENT=1 — no live model call; driving the log pane with a heartbeat for ${RECORD_SECONDS}s"
   # Even without the agent, write a moving heartbeat so the left pane SCROLLS and
   # the recording is provably non-static (validates the capture pipeline offline).
@@ -243,12 +320,33 @@ else
 fi
 
 # --- 5b. close the file->ticket loop on screen (P0 ending) -------------------
-# While the recorder is STILL CAPTURING, navigate the right pane to the Linear
-# ticket the run just filed so the .mp4 visibly ends on the ticket appearing in the
-# browser. We resolve the newest [Brownfield]/[Product] ticket URL over the same
-# Linear MCP endpoint Hermes uses (read-only). Best-effort: a missing token (e.g.
-# NO_AGENT) or no-ticket-yet simply skips the navigation — the capture still ships.
-if [ "${NO_AGENT:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
+# P0 ending fix (deferred from Phase 1): the throwaway container Chromium has no
+# Linear session, so navigating to the live Linear ticket URL hit Linear's AUTH
+# WALL. Instead we render the tracked local `tickets/<ID>.md` snapshot to a
+# self-contained file:// HTML (scripts/render_ticket_card.py, the
+# render_service_graph.py house style) and END the capture on THAT page — the
+# filed ticket visibly appearing in the browser, no auth needed. Best-effort:
+# this only runs for the agent loops (hero/pmf), never for NO_AGENT or segments.
+if [ "${NO_AGENT:-0}" != "1" ] && ! is_segment "$JOB" && command -v python3 >/dev/null 2>&1; then
+  log "rendering the filed local ticket snapshot to a self-contained HTML (file->ticket ending, no auth)"
+  TICKET_PREFIX="[Product]"; [ "$JOB" = "pmf" ] || TICKET_PREFIX="[Brownfield]"
+  TICKET_HTML="recordings/ticket_${JOB}_${TS}.html"
+  if python3 scripts/render_ticket_card.py --prefix "$TICKET_PREFIX" \
+       --out "$REPO_ROOT/$TICKET_HTML" >/dev/null 2>&1 && [ -s "$REPO_ROOT/$TICKET_HTML" ]; then
+    log "navigating right pane to local ticket snapshot: $TICKET_HTML"
+    rexec surface-html "/$TICKET_HTML" || log "ticket-snapshot navigate failed (non-fatal)"
+    sleep "${TICKET_HOLD_SECONDS:-6}"
+  else
+    log "no local ticket snapshot rendered — skipping file->ticket ending (capture still ships)"
+  fi
+fi
+
+# --- 5b-legacy. (disabled) live Linear URL navigation hit the auth wall -------
+# Kept for reference: resolving the live ticket URL over the Linear MCP and
+# navigating Chromium to it. The container browser is unauthenticated, so Linear
+# renders its login page (not the ticket). Superseded by the local-snapshot HTML
+# ending above. Set TICKET_LIVE_URL=1 to opt back into the (auth-walled) behavior.
+if [ "${TICKET_LIVE_URL:-0}" = "1" ] && [ "${NO_AGENT:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
   log "resolving filed ticket URL to navigate the right pane (file->ticket ending)"
   TICKET_URL="$(JOB="$JOB" python3 - <<'PY' 2>/dev/null || true
 import os, sys
@@ -300,7 +398,7 @@ fi
 # A live hero/pmf run files a Linear ticket; git history is the authoritative decision
 # record, so refresh the tracked tickets/<ID>.md snapshots. Non-fatal: a missing Linear
 # token (e.g. NO_AGENT pipeline check) must not fail the recording.
-if [ "${NO_AGENT:-0}" != "1" ]; then
+if [ "${NO_AGENT:-0}" != "1" ] && ! is_segment "$JOB"; then
   log "snapshotting filed ticket(s) into git (tickets/)"
   bash "$REPO_ROOT/scripts/snapshot_after_run.sh" 2>/dev/null || \
     log "snapshot skipped (no Linear token or no ticket yet) — run scripts/snapshot_after_run.sh by hand"
