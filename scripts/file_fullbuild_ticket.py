@@ -364,6 +364,23 @@ real usage + Stripe data.
 **Rationale.** Completes the learning loop the GLO-13 P4 slice scaffolded; depends on accumulated
 usage data, so it follows the memory-capture (P1) and remediation (P2) work.
 
+### P6 — Autonomous PR-review loop: HumanLayer PR → Hermes resume → Greptile review → triage (newly discovered)
+**Scope.** Close the full autonomy loop. When HumanLayer opens a PR, fire a GitHub `pull_request`
+(opened/synchronize) **webhook** into Hermes' existing `hermes webhook` receiver so the orchestrator
+**resumes** and **kicks off a Greptile review** of the PR, then **ingests Greptile's findings and
+triages them** — grounding each via `query_cto_knowledge` and filing `[Brownfield]` follow-ups /
+a Kanban card (or requesting changes) rather than leaving them as raw inline comments. Net loop:
+plan → implement → PR (HumanLayer) → `pull_request` webhook → Hermes → Greptile review → triage →
+new grounded tickets.
+**Design notes.** Greptile also ships a GitHub App that auto-reviews on PR-open with no custom hook;
+routing *through Hermes* is what adds the sovereign-CTO payoff — the **triage/grounding step** that
+turns review comments into prioritized, textbook-grounded work. Capture both paths; the webhook +
+triage is the load-bearing build. Keep egress deny-by-default (the Greptile/GitHub endpoints join
+the `policy.yaml` allow-list).
+**Rationale.** Turns the repo from "agents that ship code" into "agents that ship *and review* code"
+— the missing half of an autonomous engineering factory. Sequenced after the memory-capture (P1)
+so review-triage decisions also accumulate into long-lived memory.
+
 ---
 
 ## Part C — rolled-forward original deferred items (with rationale)

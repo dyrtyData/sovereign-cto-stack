@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:35:22+00:00
+- **snapshot captured:** 2026-06-27T23:47:33+00:00
 
 ## Description
 
@@ -95,7 +95,7 @@ PMF, every CTO function) must **write each decision to the configured mem0** `me
 ****on every run** — passive, long-lived memory capture — so the system genuinely remembers what it
 decided and why across runs, not just re-seeds from the tracked `tickets/` snapshots. Git history
 stays authoritative (`policy.yaml` of the mind: mem0 is a complement, never a dependency), but the
-recall convenience must actually fill up. This is the user's explicitly-requested <issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-14</issue> item.
+recall convenience must actually fill up. This is the user's explicitly-requested <issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/full-build-sovereign-cto-stack-next-epic-glo-13-p0-p4-shipped-rolled">GLO-14</issue> item.
 **Rationale.** Today the loop *reads* prior decisions (seeded from `tickets/[Product]` + git) but
 never *writes* new ones, so the memory never grows. Closing the write path is the difference
 between a demo of memory and a system that learns. Highest priority — it is load-bearing for the
@@ -143,6 +143,24 @@ North Star — **opportunities shipped**, not tickets filed — is computed from
 real usage + Stripe data.
 **Rationale.** Completes the learning loop the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 slice scaffolded; depends on accumulated
 usage data, so it follows the memory-capture (P1) and remediation (P2) work.
+
+### P6 — Autonomous PR-review loop: HumanLayer PR → Hermes resume → Greptile review → triage (newly discovered)
+
+**Scope.** Close the full autonomy loop. When HumanLayer opens a PR, fire a GitHub `pull_request`
+(opened/synchronize) **webhook** into Hermes' existing `hermes webhook` receiver so the orchestrator
+**resumes** and **kicks off a Greptile review** of the PR, then **ingests Greptile's findings and****
+****triages them** — grounding each via `query_cto_knowledge` and filing `[Brownfield]` follow-ups /
+a Kanban card (or requesting changes) rather than leaving them as raw inline comments. Net loop:
+plan → implement → PR (HumanLayer) → `pull_request` webhook → Hermes → Greptile review → triage →
+new grounded tickets.
+**Design notes.** Greptile also ships a GitHub App that auto-reviews on PR-open with no custom hook;
+routing *through Hermes* is what adds the sovereign-CTO payoff — the **triage/grounding step** that
+turns review comments into prioritized, textbook-grounded work. Capture both paths; the webhook +
+triage is the load-bearing build. Keep egress deny-by-default (the Greptile/GitHub endpoints join
+the `policy.yaml` allow-list).
+**Rationale.** Turns the repo from "agents that ship code" into "agents that ship *and review* code"
+— the missing half of an autonomous engineering factory. Sequenced after the memory-capture (P1)
+so review-triage decisions also accumulate into long-lived memory.
 
 ---
 
