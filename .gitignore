@@ -1,1 +1,35 @@
+# === Secrets (never commit) ===
 .env
+.env.local
+
+# === Riptide / HumanLayer artifacts (cloud-synced symlink target) ===
+.humanlayer/tasks/
+
+# === Local databases (mem0 pgvector, Hermes state/kanban, SQLite) ===
+*.db
+*.db-shm
+*.db-wal
+
+# === Hermes local home artifacts ===
+.hermes/
+
+# === Generated analysis & run artifacts ===
+graphify-out/
+recordings/
+workspaces/
+
+# === Corpus: converted copyrighted textbooks stay LOCAL ===
+# Conversion scripts are tracked; their Markdown output is not (review decision).
+corpus/
+
+# === Python ===
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# === macOS ===
+.DS_Store
+
+# === Local scratch / exploratory notes (not part of the public repo) ===
+geminiExploratoryThread*.docx

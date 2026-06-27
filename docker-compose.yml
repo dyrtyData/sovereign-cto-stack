@@ -1,0 +1,55 @@
+# Sovereign CTO Stack — compose skeleton.
+#
+# Phase 0: service stubs declared but NOT yet wired. Each service is fleshed
+# out in a later phase (see comments). This file must pass `docker compose config -q`.
+#
+#   mem0-postgres  -> Phase 1 (Postgres + pgvector for self-hosted mem0)
+#   rag-sidecar    -> Phase 2 (local Vector MCP serving query_cto_knowledge)
+#   recorder       -> Phase 4 (Xvfb + ffmpeg x11grab -> recordings/*.mp4)
+#
+# mem0 itself runs as the SDK on the host against mem0-postgres (review decision:
+# the full mem0 OSS server + Next.js dashboard is deferred to the Phase 5 full-build ticket).
+
+services:
+  # --- Phase 1: persistent memory backend for mem0 (SDK-on-host) ---
+  mem0-postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mem0}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mem0}
+      POSTGRES_DB: ${POSTGRES_DB:-vector_store}
+    ports:
+      - "5432:5432"
+    volumes:
+      - mem0-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mem0} -d ${POSTGRES_DB:-vector_store}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # --- Phase 2: local Vector RAG MCP sidecar (query_cto_knowledge) ---
+  # build context rag/ added in Phase 2; image placeholder keeps the stub valid now.
+  rag-sidecar:
+    image: python:3.12-slim
+    command: ["sh", "-c", "echo 'rag-sidecar stub (wired in Phase 2)'; sleep infinity"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./corpus:/corpus:ro
+    restart: unless-stopped
+    profiles: ["rag"]
+
+  # --- Phase 4: Xvfb + ffmpeg recorder sidecar (-> recordings/*.mp4) ---
+  recorder:
+    image: debian:bookworm-slim
+    command: ["sh", "-c", "echo 'recorder stub (wired in Phase 4)'; sleep infinity"]
+    volumes:
+      - recordings:/recordings
+    restart: unless-stopped
+    profiles: ["record"]
+
+volumes:
+  mem0-data:
+  recordings:
