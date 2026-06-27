@@ -160,6 +160,16 @@ log "completing task $TASK_ID with structured handoff (-> done)"
   --result "$SUMMARY" \
   --metadata "$METADATA" >/dev/null
 
+# --- 5. persist any [Product] ticket the live run filed into git (Phase-5 wiring) ---
+# A live PMF run files a [Product] ticket; git history is the authoritative decision
+# record, so refresh the tracked tickets/<ID>.md snapshots. Non-fatal (NO_AGENT writes a
+# stub brief and files no ticket, so there is nothing to snapshot in that mode).
+if [ "${NO_AGENT:-0}" != "1" ]; then
+  log "snapshotting filed [Product] ticket(s) into git (tickets/)"
+  bash "$REPO_ROOT/scripts/snapshot_after_run.sh" 2>/dev/null || \
+    log "snapshot skipped (no Linear token or no ticket yet) — run scripts/snapshot_after_run.sh by hand"
+fi
+
 log "done — brief: $BRIEF"
 echo "TASK_ID=$TASK_ID"
 echo "BRIEF=$BRIEF"

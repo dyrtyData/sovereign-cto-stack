@@ -127,4 +127,13 @@ throughput and deployment performance).
    (or `get_issue`) and verify the `Brownfield` label is attached, the body names a
    concrete `src/<service>/` file, and it carries a `Grounded in:` line for **every
    distinct `source_file` your multi-angle queries returned** (not just one).
-2. Report the issue identifier/URL and a one-line summary; deliver to Telegram.
+2. **Persist the ticket into git (decision record).** Git history is the authoritative
+   record of every CTO decision (design "Desired End State"), so snapshot the ticket you
+   just filed into the tracked `tickets/<ID>.md`:
+   ```bash
+   python3 scripts/snapshot_tickets.py <THE_ID>     # e.g. GLO-13
+   # or, to refresh every agent-filed ticket: bash scripts/snapshot_after_run.sh
+   ```
+   Then the operator reviews and commits `tickets/`. (Cron/recorded runs call
+   `scripts/snapshot_after_run.sh` automatically as a post-step.)
+3. Report the issue identifier/URL and a one-line summary; deliver to Telegram.

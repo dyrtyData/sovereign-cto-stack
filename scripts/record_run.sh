@@ -218,5 +218,15 @@ if command -v python3 >/dev/null 2>&1; then
     echo "record_run: verification FAILED for $OUT_PATH" >&2; exit 1; }
 fi
 
+# --- 8. persist any ticket the live run filed into git (Phase-5 wiring) ------
+# A live hero/pmf run files a Linear ticket; git history is the authoritative decision
+# record, so refresh the tracked tickets/<ID>.md snapshots. Non-fatal: a missing Linear
+# token (e.g. NO_AGENT pipeline check) must not fail the recording.
+if [ "${NO_AGENT:-0}" != "1" ]; then
+  log "snapshotting filed ticket(s) into git (tickets/)"
+  bash "$REPO_ROOT/scripts/snapshot_after_run.sh" 2>/dev/null || \
+    log "snapshot skipped (no Linear token or no ticket yet) — run scripts/snapshot_after_run.sh by hand"
+fi
+
 log "OK — recording at $OUT_PATH"
 echo "$OUT_PATH"

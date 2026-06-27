@@ -77,11 +77,16 @@ Complete every item before running later phases.
 ├── scripts/
 │   └── preflight.sh          # halts if required .env keys are missing
 ├── docs/
-│   ├── setup-guide.md         # repeatable setup (filled incrementally per phase)
-│   └── system-design-tradeoffs.md  # textbook-cited decision record
+│   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)
+│   ├── system-design-tradeoffs.md  # textbook-cited decision record (Q1–Q8b + deferred work)
+│   └── cto-functions.md       # "teach me to think like a CTO" — functions + grounding texts
+├── tickets/                   # git-tracked snapshots of every filed Linear ticket
 └── corpus/                   # converted textbooks (gitignored — stays local)
 ```
 
 > **Documentation policy:** git history is the authoritative decision record; mem0 is a
 > complement, not a dependency. `docs/system-design-tradeoffs.md` cites the named textbooks
-> behind every locked decision.
+> behind every locked decision, and every Linear ticket the agents file is snapshotted into the
+> tracked `tickets/<ID>.md` (`scripts/snapshot_tickets.py` / `scripts/snapshot_after_run.sh`) so
+> the decision record lives in git. `docs/cto-functions.md` maps each CTO function to the corpus
+> texts that ground it.

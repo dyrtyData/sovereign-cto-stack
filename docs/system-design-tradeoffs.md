@@ -17,6 +17,29 @@ surfaces. Until then, citations name the text by title.
 
 ## Locked decisions
 
+### Q1 — Scope: strict sequential, gated phasing (+ a Phase 0 and a demo slice)
+
+The build is **Phase 0→1→2→3→4→5, strictly sequential and gated**: each phase is a thin
+vertical slice that boots and is independently verifiable before the next begins. This matches
+the ticket's own "do not move to Phase 2 until Phase 1 is operational," de-risks the EOD-June-30
+deadline (a partial-but-working slice always exists), and gives a clean public-showcase
+narrative. The discarded alternatives were **parallel workstreams** (external dependencies —
+tokens, OAuth logins — serialize the work anyway, and partial failures compound) and
+**single-domain only** (too narrow; sacrifices the showcase breadth).
+
+**Reconciliation (precedence: outline > design > research).** The design discussion sequenced
+the RAG brain *after* the tech-debt loop, but Q5 mandates consulting `query_cto_knowledge`
+*before every CTO function, including the tech-debt loop*. To honor Q5 without a backward
+dependency, the RAG brain was brought **up to Phase 2, before** the first grounded CTO function
+(Phase 3). The hero demo is still the tech-debt audit; no phase requires a later phase to verify.
+
+**The parallel deliverable** (this decision's second half): author one comprehensive
+**"full-build" Linear ticket** capturing the entire vision + the deferred backlog so the whole
+system can be rebuilt later even though only the phased slice is executed now. Filed in Phase 5.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — sequencing investments rather than starting
+> everything at once; *Accelerate* — small-batch delivery and keeping a working increment._
+
 ### Q2 — Standalone repo, gitignored by the parent (nested-repo safety)
 
 `sovereignCTO/` is its own git repo (`git init`, remote `dyrtyData/sovereign-cto-stack`) nested
@@ -68,12 +91,41 @@ Anthropic key. This is captured in the Phase-5 full-build ticket.
 > _Grounded in: *The Engineering Executive's Primer* (Fournier) — deferring tooling investment
 > until it is justified by a concrete workflow need._
 
-## Open / deferred items (tracked for the Phase-5 full-build ticket)
+### Q6 — mem0 & graphify placement: local-first, with mem0 Platform as fallback
 
-- Full mem0 OSS server + Next.js dashboard (Phase 1 uses SDK-on-host against pgvector).
-- OpenHands via Portal/LiteLLM (Q7).
-- Second-account "fresh setup" walkthrough (Q4/Q8b).
-- OpenShell/NemoClaw egress hardening on Apple Silicon, incl. `policy.yaml` allow-list shape (Q3).
+graphify runs **locally on the host** against the cloned audit target (the code-graph layer is
+fully local via tree-sitter; no LLM key for the default AST path). mem0 is Hermes' **native
+memory provider, self-hosted on Postgres + pgvector** (SDK-on-host; see the deferred note below
+on why the full OSS server is out of the critical path). **mem0 Platform** (`MEM0_API_KEY`,
+already in `.env`) is the **fallback** if the self-hosted path is troublesome. This pairs with
+the project's durability principle: **memory is a convenience layer over the authoritative git
+history** — if mem0 is unavailable or wrong, the git log + this doc must still let a human
+reconstruct every decision. Discarded: a Neo4j graph push (extra service, unneeded for
+static-coupling analysis).
+
+> _Grounded in: *Accelerate* — version control of everything as the source of truth; mem0 as a
+> recall convenience, never a dependency._
+
+### Q8 / Q8b — Manual prerequisites gate; both accounts greenfield
+
+A **Manual Prerequisites** checklist sits at the top of the README and the build **halts** on it
+(programmatically via `scripts/preflight.sh`, which fails on any missing/placeholder required
+key). Both Nous accounts are **greenfield** (corrected from the ticket's premise): only the
+static `NOUS_PORTAL_API_KEY` and `MEM0_API_KEY` exist; Hermes was not installed, Portal OAuth not
+run, no Telegram bot, Linear connected only to HumanLayer. So the "primary account already
+configured" path is dropped — it collapses into Q4 (one greenfield account, multiple profiles).
+
+The only **human-gated** points are: (1) the two browser OAuth approvals (`hermes portal login`;
+`hermes mcp install linear`), (2) creating the Telegram bot token + numeric id by hand
+(@BotFather / @userinfobot) into `.env`, (3) the Telegram hello-world confirmation, and (4)
+keeping the laptop plugged in + lid open for long/recorded runs. Everything else is scripted and
+reproducible from the [setup guide](./setup-guide.md). The **hero demo is the Phase-3 tech-debt
+audit** (visually concrete, central to the primary use case); the PMF brief is the secondary
+capture. The Docker `ffmpeg`/`Xvfb` sidecar is the capture method (manual screen recording was
+the discarded deadline fallback).
+
+> _Grounded in: *The Engineering Executive's Primer* — making prerequisites explicit and gating
+> on them rather than discovering missing setup mid-flight._
 
 ### Q5 — CTO knowledge RAG: local Vector MCP sidecar; consult before *every* CTO function
 
@@ -227,3 +279,88 @@ recording captures. The renderer is tracked; its HTML output stays in the gitign
 
 > _Grounded in: *Accelerate* — make the signal legible and reproducible; the audit's value is
 > only realized if a human can see the coupling hub at a glance._
+
+### Phase 4 — PMF research, Kanban coordination, recording
+
+**Decision: the PMF researcher is a second `cto-market` profile coordinating over the shared
+Kanban board, not a fan-out subagent.** The two specialists (`cto-architecture`, `cto-market`)
+and the orchestrator share one `~/.hermes/kanban.db` (design Q4). The PMF run is driven through
+the board lifecycle (`create → claim → run → complete` with a structured `summary` + `metadata`
+handoff), so the result is a durable, readable `task_runs` row — not an ephemeral RPC return.
+This is the durable, audit-trailed coordination primitive over the ephemeral `delegate_task`
+fan-out (research §5).
+
+> _Grounded in: *Team Topologies* — single-responsibility teams coordinating over a clear shared
+> interface; *An Elegant Puzzle* — durable coordination surfaces over fire-and-forget delegation._
+
+**Decision: close the PMF loop into a filed `[Product]` ticket, not just a brief.** A brief no
+one acts on is inert, so every PMF run scans the current product, diffs it against the market
+findings, picks ONE concrete capability gap, and files a HumanLayer-ready `[Product]` ticket
+(GLO-12). Notably the agent independently surfaced the **autonomous-remediation gap** (detect-only
+auditor → no PR), which is exactly the white space the full-build P3 backlog formalizes.
+
+> _Grounded in: *The Lean Product Playbook* — moving down the PMF Pyramid from problem to a
+> concrete feature bet; *Hacking Growth* — a North Star (opportunities shipped) over vanity output._
+
+**Decision: record a LIVE split-screen surface, because `x11grab` records pixels.** A text-only
+agent run captures a black frame, so the recorder paints a visible surface onto `:99` *before*
+capture and `record_run.sh` refuses to start if no window is mapped. The hero recording is a live
+split-screen: the auditor's log scrolling on the left (`tail -f`, demonstrably non-static) next to
+the legible coupling graph on the right. `verify_recording.py` asserts container validity,
+`duration>0`, a finalized moov atom, a non-blank mid frame, **and** non-static (inter-frame luma
+delta) — so a black or still recording fails CI.
+
+> _Grounded in: *Accelerate* — make the working system observable and the demo reproducible._
+
+## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
+
+These are intentional deferrals, not omissions. Each is captured as a prioritized section of the
+Phase-5 full-build Linear ticket so the complete system can be (re)built later (design Q1). The
+rationale below is the interview-ready "why now / why not now" for each.
+
+- **(P1) NemoClaw / OpenShell egress hardening on Apple Silicon, incl. `policy.yaml` allow-list
+  shape (Q3).** *Deferred because:* the Docker network allow-list gives "sovereign" egress control
+  cheaply for Phases 0–4, and the full Landlock+seccomp+OPA sandbox adds moving parts (and two
+  known macOS bugs — Landlock `best_effort` fallback; broken local-Ollama DNS) onto the
+  EOD-June-30 critical path. It is confirmed viable on Apple Silicon (Docker Desktop LinuxKit VM /
+  libkrun + Hypervisor.framework) and is the competition's safety/egress story, so it is P1.
+- **(P2) Stripe skills integration (competition requirement).** *Deferred because:* the hackathon
+  slice proves the grounded-CTO-function loop end-to-end without live billing data. The primary
+  future use is to GROUND the PMF brief's AARRR Revenue/Retention in real MRR/churn/cohorts
+  (vs assumptions); secondary is a billing-path tech-debt audit (the highest-business-impact code).
+- **(P3) SonarQube + graphify → Hermes judgment layer → Codegen / Moderne remediation.**
+  *Deferred because:* the hero loop already proves the detect→ground→file chain on graphify;
+  augmenting detection with SonarQube and adding autonomous remediation backends is a substantial
+  build. The architecture is recorded in the full-build ticket — Hermes stays the textbook-grounded
+  curation/judgment layer (the white space); graphify is kept for cross-service coupling (SonarQube
+  has no coupling metrics).
+- **(P4) PMF → product loop, full version.** *Deferred because:* the thin loop (one ranked
+  opportunity, one ticket) is enough to demonstrate the capability; the full version (multiple
+  opportunities ranked RICE/ICE, grounded in real usage + Stripe data, a feedback loop on shipped
+  bets) depends on P2 and on accumulated usage data.
+- **Full mem0 OSS server + Next.js dashboard.** *Deferred because:* Phase 1 uses the mem0
+  SDK-on-host against pgvector — minimal moving parts on the critical path; the dashboard is not
+  required to verify any phase, and the M3 can add it later resource-wise.
+- **OpenHands via Portal/LiteLLM (Q7).** *Deferred because:* the greenfield path for now is
+  "Hermes research → HumanLayer Linear ticket → Claude Code executes." Claude Code Max cannot back
+  OpenHands (OAuth tokens blocked in third-party tools); pointing OpenHands at the Portal
+  OpenAI-compatible endpoint via LiteLLM is the chosen future enablement (avoids a separate
+  Anthropic key).
+- **Second-account "fresh setup" walkthrough (Q4/Q8b).** *Deferred because:* the single-account /
+  multiple-profiles topology is what makes the shared Kanban board work (Hermes has no cross-host /
+  cross-account coordination primitive); a two-account setup is documented for the future only.
+- **Video authenticity upgrade.** *Deferred because:* the current recording uses a progress ticker
+  alongside the real agent output (Hermes' `-z` buffers its final answer); streaming real
+  tool-call events from Hermes' session log into the recording is a polish item, not a blocker.
+
+## Interview-ready summary (the showcase goal)
+
+The throughline is **grounded, reproducible, version-controlled CTO judgment**. Every CTO
+function consults a textbook RAG brain *first* and cites the union of texts retrieval returns
+(no single-shot guessing); every decision is captured in git (the authoritative record) with mem0
+as a recall convenience, never a dependency; every phase is a thin, independently-verifiable slice
+sequenced to de-risk a hard deadline; and every external dependency (secrets, OAuth, sandboxing)
+is either gated on an explicit prerequisites checklist or deferred with a written rationale. The
+hero loop — graphify maps a real polyglot system, the agent grounds the finding in named texts and
+files a HumanLayer-ready `[Brownfield]` ticket — is the concrete proof that the factory does
+real CTO work, not a demo of toy output.

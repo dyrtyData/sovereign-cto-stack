@@ -199,5 +199,14 @@ matching Kanban row.
 
 1. Confirm the brief file exists and contains at least one `Grounded in:` line
    citing a real corpus `*.md`.
-2. Report the brief path, the cited sources, and the one-line recommendation;
+2. **Persist the `[Product]` ticket into git (decision record).** Git history is the
+   authoritative record of every CTO decision (design "Desired End State"), so snapshot
+   the ticket you just filed into the tracked `tickets/<ID>.md`:
+   ```bash
+   python3 scripts/snapshot_tickets.py <THE_ID>     # e.g. GLO-13
+   # or, to refresh every agent-filed ticket: bash scripts/snapshot_after_run.sh
+   ```
+   Then the operator reviews and commits `tickets/`. (Cron/recorded runs call
+   `scripts/snapshot_after_run.sh` automatically as a post-step.)
+3. Report the brief path, the cited sources, and the one-line recommendation;
    deliver to Telegram if a delivery target is configured.

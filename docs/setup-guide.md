@@ -485,6 +485,154 @@ python3 scripts/verify_recording.py recordings/run_hero_<ts>.mp4   # RESULT: PAS
 > shows the run (1–3 min, hackathon-suitable); read the PMF brief and confirm it is coherent
 > with sensible citations; confirm the laptop stayed plugged in + lid open for the recorded run.
 
-## Phase 5 — Documentation finalization
+## End-to-end setup from a clean clone (the full walkthrough)
 
-_To be filled in during Phase 5._
+This section is the single coherent path a new operator follows to bring the whole stack up
+from a fresh `git clone`. It threads together every phase above plus the two human-gated OAuth
+approval points and the `~/.hermes` sync steps. Run it top to bottom.
+
+### 0. Prerequisites (do these by hand first — the build halts until they are done)
+
+Complete the **Manual Prerequisites** checklist in the [README](../README.md). In brief:
+
+1. **Nous Portal key** — put `NOUS_PORTAL_API_KEY` in `.env` (from
+   <https://portal.nousresearch.com/>).
+2. **Telegram bot** — message **@BotFather** (`/newbot`), then **@userinfobot** for your numeric
+   id; put `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_USERS` in `.env`.
+3. **Laptop plugged in + lid open** for any long-running or recorded run (only you can satisfy
+   this; `caffeinate -dimsu` blocks idle sleep but not lid-close on battery).
+
+Two browser OAuth approvals happen *during* the build, not now — they are flagged inline below
+with :warning: and require **your click**:
+
+- **Portal login** — `hermes portal login` (== `hermes setup --portal`), in **step 2** (Phase 1).
+- **Linear MCP** — `hermes mcp install linear`, in **step 5** (Phase 3); separate from
+  HumanLayer's Linear connection.
+
+```bash
+git clone https://github.com/dyrtyData/sovereign-cto-stack.git
+cd sovereign-cto-stack
+cp .env.example .env          # then fill in the real values from the prerequisites
+bash scripts/preflight.sh     # HALTS until NOUS_PORTAL_API_KEY + TELEGRAM_* are present
+docker compose config -q      # validate the full compose stack
+```
+
+### 1. Hermes + memory + Telegram (Phase 1)
+
+```bash
+uv tool install hermes-agent --with mcp --with python-telegram-bot   # mcp SDK needed in step 4
+hermes --version                                  # v0.17.0+
+docker compose up -d mem0-postgres                # pgvector backend (host port 5433)
+hermes portal login                               # :warning: APPROVE IN BROWSER (Portal OAuth)
+hermes model                                      # pick a Nous model
+hermes config set memory.provider mem0
+uv run scripts/mem0_roundtrip.py                  # exit 0 == memory persistence proven
+# copy TELEGRAM_* into ~/.hermes/.env (or `hermes gateway setup`), then:
+hermes gateway start
+```
+
+### 2. CTO RAG brain (Phase 2)
+
+```bash
+bash scripts/convert_corpus.sh                    # docling (PDF) + pandoc (EPUB) -> corpus/*.md
+docker compose --profile rag up -d --build rag-sidecar
+curl -s localhost:8080/health                     # {"status":"ready","chunks":N,"sources":M}
+uv run scripts/rag_smoke.py                        # exit 0 == cited-chunk retrieval works
+hermes mcp add cto_knowledge --url http://localhost:8080/mcp
+hermes mcp test cto_knowledge                     # ✓ Connected, 1 tool: query_cto_knowledge
+```
+
+**Sync the standing instruction into `HERMES_HOME`** so the supervised gateway loads it
+(detailed reasoning in *Phase 2 → §4* above — `SOUL.md` is always loaded from `~/.hermes`,
+`AGENTS.md` only from the cwd, and the supervised gateway's cwd is locked to `~/.hermes`):
+
+```bash
+cp hermes/SOUL.md   ~/.hermes/SOUL.md      # always-loaded identity slot (carries the rule)
+cp hermes/AGENTS.md ~/.hermes/AGENTS.md
+chmod 600 ~/.hermes/SOUL.md ~/.hermes/AGENTS.md
+hermes gateway restart
+```
+
+### 3. Tech-debt auditor profile + Linear (Phase 3 — the hero loop)
+
+```bash
+bash scripts/run_graphify.sh                      # -> graphify-out/service-coupling.json (frontend=7, checkout=6)
+hermes profile create cto-architecture --clone    # inherits cto_knowledge MCP binding
+# sync the auditor identity + skill into the profile home (repo is source of truth):
+PROF=~/.hermes/profiles/cto-architecture
+cp hermes/profiles/cto-architecture/SOUL.md "$PROF/SOUL.md"
+mkdir -p "$PROF/skills/file_brownfield_ticket"
+cp hermes/skills/file_brownfield_ticket.md "$PROF/skills/file_brownfield_ticket/SKILL.md"
+chmod 600 "$PROF/SOUL.md" "$PROF/skills/file_brownfield_ticket/SKILL.md"
+
+hermes mcp install linear                         # :warning: APPROVE IN BROWSER (Linear OAuth)
+# per-profile token gotcha (v0.17.0): copy the approved token into the profile cache
+mkdir -p "$PROF/mcp-tokens"
+cp -p ~/.hermes/mcp-tokens/linear*.json "$PROF/mcp-tokens/"
+chmod 600 "$PROF/mcp-tokens/"*.json
+```
+
+Run the hero loop (audit → multi-angle ground → file `[Brownfield]` ticket), then snapshot it
+into git (see *Ticket tracking* below), and schedule it on cron — all documented in **Phase 3**
+above.
+
+### 4. PMF profile + recording (Phase 4)
+
+```bash
+hermes profile create cto-market --clone
+PROF=~/.hermes/profiles/cto-market
+cp hermes/profiles/cto-market/SOUL.md "$PROF/SOUL.md"
+mkdir -p "$PROF/skills/pmf_brief"; cp hermes/skills/pmf_brief.md "$PROF/skills/pmf_brief/SKILL.md"
+mkdir -p "$PROF/mcp-tokens"; cp -p ~/.hermes/mcp-tokens/linear*.json "$PROF/mcp-tokens/"
+chmod 600 "$PROF/SOUL.md" "$PROF/skills/pmf_brief/SKILL.md" "$PROF/mcp-tokens/"*.json
+
+bash scripts/pmf_kanban_run.sh "<your PMF question>"   # brief + [Product] ticket via Kanban
+docker compose --profile record up -d --build recorder
+bash scripts/run_graphify.sh                           # ensure the hero surface exists
+bash scripts/record_run.sh hero                        # -> recordings/run_hero_<ts>.mp4
+```
+
+> Keep the laptop **plugged in with the lid open** for the recorded run (Manual Prerequisite).
+
+## Ticket tracking (git is the authoritative decision record)
+
+Every Linear ticket the agents file is **snapshotted into the tracked `tickets/<ID>.md`** so the
+decision record lives in git, not only in Linear (design "Desired End State": git history is
+authoritative; mem0 is a complement). The tracked `scripts/snapshot_tickets.py` reads each ticket
+back over the same Linear MCP endpoint Hermes uses (via `scripts/linear_mcp.py`, OAuth token from
+the gitignored Hermes cache) and writes title / identifier / url / labels / priority / full
+description + a `snapshot captured:` timestamp.
+
+**This is wired into the filing workflow, not a one-off:**
+
+- The auditor and PMF skills (`hermes/skills/file_brownfield_ticket.md`,
+  `hermes/skills/pmf_brief.md`) end with a **"persist into git"** step instructing the operator
+  to run the snapshot after a ticket is filed.
+- `scripts/snapshot_after_run.sh` is the convenience wrapper: it snapshots the explicit ids you
+  pass, or (with none) **discovers every `[Brownfield]`/`[Product]` ticket on the team and
+  snapshots them all**. The Phase-4 run scripts call it as a post-step so a recorded/cron run
+  leaves the git snapshot up to date automatically.
+
+```bash
+# after any filed ticket (one or more ids):
+python3 scripts/snapshot_tickets.py GLO-13
+# or discover + snapshot all agent-filed tickets in one go:
+bash scripts/snapshot_after_run.sh
+git add tickets/ && git commit -m "snapshot filed Linear tickets"
+```
+
+> `tickets/` is intentionally **not** gitignored (ticket bodies are non-secret;
+> `gitleaks protect --staged` is clean over them). Re-running the snapshot is idempotent — it
+> overwrites `tickets/<ID>.md` with the current Linear state.
+
+## Final public-readiness pass (before sharing the repo)
+
+```bash
+gitleaks detect --no-banner                       # no secret committed (also: gitleaks protect --staged)
+docker compose config -q                          # full stack still valid
+python3 scripts/check_doc_links.py                # no broken internal links across docs/**
+bash scripts/fresh_clone_smoke.sh                 # clone path: cp .env.example .env (stubs) -> preflight HALTS
+```
+
+The two browser OAuth steps (Portal, Linear) and the Telegram hello-world remain the only
+human-gated points; everything else is scripted and reproducible from this guide.
