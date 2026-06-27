@@ -1,0 +1,86 @@
+# Sovereign CTO Stack — deny-by-default egress allow-list (Phase 2 / P1).
+#
+# This is the reviewable safety ARTIFACT (design Q3-main, Option C): the single
+# auditable place that declares *every* outbound network destination the
+# containerized sub-tools are permitted to reach. Everything not named here is
+# REFUSED — the deny-by-default posture that turns the "sovereign" claim into an
+# enforced property rather than a docs assertion.
+#
+# Shape follows the NemoClaw/OpenShell network-policy schema (host + port +
+# enforcement + access). The egress CONNECT proxy (docker-compose service
+# `egress-proxy`, profile `egress`) loads this file read-only and evaluates every
+# HTTP CONNECT against `network_policies[*].endpoints[*]`: a CONNECT whose
+# host:port matches an `enforcement: enforce` endpoint is tunnelled; any other
+# CONNECT is refused with `403 egress-policy-deny`.
+#
+# The gate (scripts/assert_egress_policy.py) asserts BOTH halves (design Q3-sub,
+# Option β): the load-bearing NEGATIVE test — a CONNECT to a host NOT listed here
+# is refused — plus a positive-path check that api.linear.app:443 succeeds.
+#
+# NOTE on the kernel layers: this OPA CONNECT network layer is INDEPENDENT of the
+# Landlock filesystem layer, so the network assertion stays reliable even where
+# Landlock `best_effort` silently degrades on macOS (OpenShell #803 — documented
+# in docs/system-design-tradeoffs.md). Node agents must additionally whitelist the
+# `/usr/local/bin/node` binary on the filesystem layer (recorded below for the
+# full OpenShell deployment; the CONNECT proxy itself enforces only the network).
+
+version: 1
+
+network_policies:
+  # Linear MCP — the [Brownfield]/[Product] ticket-filing endpoint Hermes uses.
+  linear_api:
+    endpoints:
+      - host: api.linear.app
+        port: 443
+        enforcement: enforce
+        access: read-write
+      - host: mcp.linear.app
+        port: 443
+        enforcement: enforce
+        access: read-write
+
+  # Telegram — the Hermes gateway messaging channel.
+  telegram_api:
+    endpoints:
+      - host: api.telegram.org
+        port: 443
+        enforcement: enforce
+        access: read-write
+
+  # Nous Portal — the cloud inference endpoint (no local GPU on Apple Silicon).
+  nous_inference:
+    endpoints:
+      - host: inference-api.nousresearch.com
+        port: 443
+        enforcement: enforce
+      - host: portal.nousresearch.com
+        port: 443
+        enforcement: enforce
+
+  # Web scrape — the PMF researcher's market-research surface. Scoped to the
+  # specific endpoints the loop actually hits rather than an open allow-all.
+  web_scrape:
+    endpoints:
+      - host: r.jina.ai
+        port: 443
+        enforcement: enforce
+        access: read
+      - host: duckduckgo.com
+        port: 443
+        enforcement: enforce
+        access: read
+      - host: html.duckduckgo.com
+        port: 443
+        enforcement: enforce
+        access: read
+
+# Filesystem layer (OpenShell Landlock) — recorded for the full sandbox
+# deployment; the CONNECT proxy enforces only the network policies above.
+# Node-based agents must whitelist their interpreter so Landlock does not block
+# the runtime itself.
+filesystem_policies:
+  node_agents:
+    binaries:
+      - path: /usr/local/bin/node
+        access: execute
+        enforcement: enforce

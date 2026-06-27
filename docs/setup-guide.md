@@ -486,6 +486,63 @@ python3 scripts/verify_recording.py recordings/run_hero_<ts>.mp4   # RESULT: PAS
 > shows the run (1–3 min, hackathon-suitable); read the PMF brief and confirm it is coherent
 > with sensible citations; confirm the laptop stayed plugged in + lid open for the recorded run.
 
+## Backlog P1 — Deny-by-default egress hardening (the sovereign safety layer)
+
+The headline "sovereign"/safety layer: a reviewable allow-list (`egress/policy.yaml`)
+enforced out-of-process by a CONNECT proxy that **refuses every outbound destination not
+on the list**. This turns the sovereignty claim into an enforced property whose
+load-bearing proof is a **denial you can watch happen** (design Q3-sub, Option β).
+
+> **Prerequisite — Docker Desktop ≥ 4.60.0.** The egress layer runs inside the Docker
+> Desktop LinuxKit VM on Apple Silicon (design Q3-main); 4.60.0+ is the confirmed-viable
+> baseline. No external account or API key is required — the layer is fully local
+> (`egress-proxy` + `egress/policy.yaml`). The optional `EGRESS_HOST_PORT` in `.env`
+> (default `8888`) is ungated — `preflight.sh` is unchanged.
+
+### 1. Review the allow-list
+
+`egress/policy.yaml` is the single auditable artifact: each `network_policies` block
+(`linear_api`, `telegram_api`, `nous_inference`, `web_scrape`) names the exact `host:port`
+endpoints permitted, with `enforcement: enforce`. Node agents additionally whitelist
+`/usr/local/bin/node` on the filesystem layer. Everything not listed is denied.
+
+### 2. Bring up the egress proxy (profile-gated)
+
+The egress service is behind the `egress` compose profile so it does not disturb the
+default stack. The policy file is mounted **read-only**:
+
+```bash
+git config core.hooksPath .githooks                       # (Phase 0) tracked secret gate
+docker compose --profile egress up -d --build egress-proxy
+docker compose --profile egress logs egress-proxy         # prints the loaded allow-list
+```
+
+### 3. Verify deny-by-default (negative + positive)
+
+```bash
+python3 scripts/assert_egress_policy.py    # PASS: non-allow-listed CONNECT refused; api.linear.app:443 allowed
+```
+
+The gate's **load-bearing** assertion is the **negative** test — a CONNECT to a host that
+is *not* on the allow-list is **refused** (`403 egress-policy-deny`) — plus a positive-path
+check that `api.linear.app:443` **succeeds** (`200 Connection established`). A
+positive-only check would be satisfiable by a proxy that blocks nothing, so the negative
+test is what makes the assertion meaningful. The network CONNECT layer is independent of
+the Landlock filesystem layer, so this assertion holds even where Landlock `best_effort`
+degrades on macOS (see [system-design-tradeoffs.md](./system-design-tradeoffs.md)).
+
+You can watch the denial by hand (the dramatic beat captured for the showcase video):
+
+```bash
+curl -x http://127.0.0.1:8888 https://example.com        # CONNECT tunnel failed, response 403
+curl -x http://127.0.0.1:8888 https://api.linear.app      # 200 — allow-listed, tunnels through
+```
+
+> **Routing sub-tools through the proxy:** containerized sub-tools opt in with
+> `HTTPS_PROXY=http://egress-proxy:8888` (in-VM service name) so all their outbound HTTPS
+> is policy-evaluated. The default stack does not route through it; the proxy + gate exist
+> to *prove and enforce* the allow-list, and to ship the reviewable `policy.yaml` artifact.
+
 ## End-to-end setup from a clean clone (the full walkthrough)
 
 This section is the single coherent path a new operator follows to bring the whole stack up

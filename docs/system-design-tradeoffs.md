@@ -312,6 +312,48 @@ delta) — so a black or still recording fails CI.
 
 > _Grounded in: *Accelerate* — make the working system observable and the demo reproducible._
 
+### Backlog P1 — Deny-by-default egress hardening (built; the sovereign safety layer)
+
+The Q3 deferral above is now **partially actioned** as the GLO-13 P1 slice. What landed and
+the honest tradeoffs:
+
+**What's built.** A reviewable allow-list artifact (`egress/policy.yaml`) plus an
+out-of-process enforcement point: a stdlib-only HTTP CONNECT forward proxy
+(`egress/egress_proxy.py`, profile-gated compose service `egress-proxy`) that tunnels **only**
+the `host:port` pairs declared `enforcement: enforce` in the policy (Linear / Telegram /
+Nous-inference / web-scrape) and refuses every other CONNECT with `403 egress-policy-deny`.
+The policy is mounted **read-only**. The gate `scripts/assert_egress_policy.py` proves it.
+
+**Decision: the gate's load-bearing assertion is the NEGATIVE test (Q3-sub, Option β).**
+Deny-by-default is only meaningful if you can demonstrate a denial; a positive-only gate is
+satisfiable by a proxy that blocks nothing. So the gate asserts a CONNECT to a
+non-allow-listed host is **refused** (load-bearing) *and* `api.linear.app:443` **succeeds**
+(positive path — and the existing `assert_brownfield_ticket.py` keeps reaching Linear with
+the proxy up, proving the allow-list doesn't break legitimate egress).
+
+> _Grounded in: *Accelerate* — make safety properties observable and verifiable, not asserted;
+> reproducible feedback over trust._
+
+**Honest degradation — the two documented macOS bugs.** The network CONNECT layer (what we
+enforce + assert) is deliberately **independent of the Landlock filesystem layer**, because
+on macOS the OpenShell sandbox's Landlock support runs in `best_effort` mode and can
+**silently degrade** (OpenShell #803) — a filesystem-confinement assertion there would be
+fragile. By making the load-bearing assertion a *network* CONNECT refusal, the safety proof
+stays reliable regardless of the Landlock state. Separately, the sandbox has a known
+`inference.local` **mDNS resolution constraint** on macOS (the broken local-Ollama DNS path):
+inference therefore stays **cloud** (Nous Portal, already required since there's no CUDA on
+Apple Silicon), which sidesteps the mDNS path entirely.
+
+**Recorded for GLO-14, not built now: host-orchestrator-in-MicroVM confinement (Q3 Option B).**
+This slice enforces egress on the **containerized** sub-tools inside the LinuxKit VM. Confining
+the **host** Hermes orchestrator's own egress requires moving it into a MicroVM (libkrun +
+Hypervisor.framework), which adds the biggest moving-parts/DNS risk; that is captured as a
+**GLO-14** path, not built in this pass.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — sequence the hardening investment; enforce the
+> layer that is load-bearing and reliable now, and record the stronger confinement as a
+> deliberate next step rather than over-engineering the platform before the deadline._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the
