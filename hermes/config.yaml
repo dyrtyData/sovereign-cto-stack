@@ -49,6 +49,30 @@ gateway:
 #   hermes mcp add cto_knowledge --url http://localhost:8080/mcp
 #   hermes mcp configure cto_knowledge      # include: query_cto_knowledge
 # (or copy this block into ~/.hermes/config.yaml and run `hermes mcp list` to confirm).
+#
+# codegen (Phase 4 P3) is the REMEDIATION back-end the tech-debt loop routes to —
+# Codegen's agentic multi-file SWE backend over Streamable HTTP MCP. After the
+# fused DETECT (SonarQube) + KEEP (graphify) signal is curated into a [Brownfield]
+# ticket, Codegen is the named back-end for novel, judgment-heavy refactors
+# (the recipe-amenable, mechanical alternative is Moderne/OpenRewrite — see below).
+# Registered per the mcp_servers contract; the API key lives ONLY in ~/.hermes/.env
+# as CODEGEN_API_KEY (gitleaks-enforced — never in this file). Bind with:
+#   hermes mcp add codegen --url https://mcp.codegen.com/mcp
+#   hermes mcp configure codegen      # auto-discovers Codegen's tools
+# NOTE: Codegen is NAMED-ONLY in the loop here — the ticket routes to it and the
+# config registers it, but no live Codegen agent run is triggered automatically
+# (the free-tier runs are reserved for an optional demo). Naming the remediation
+# back-end is the architectural decision; the live call is opt-in.
+#
+# Moderne/OpenRewrite (alternative remediation back-end, NOT registered here):
+# OpenRewrite is the OSS deterministic recipe engine (Lossless Semantic Trees +
+# composable Visitor recipes, format-preserving) — ideal for recipe-amenable,
+# mechanical debt. Moderne ships a LOCAL MCP server installed with:
+#   mod config agent-tools install        # exposes trigrep_search, find_types,
+#                                          # change_type, search_recipes, run_recipe…
+# Moderne has NO free tier, so it is documented as the recipe-amenable alternative
+# and "evaluate Moderne (paid)" is rolled into GLO-14; the live named back-end for
+# this stack is Codegen above.
 mcp_servers:
   cto_knowledge:
     url: "http://localhost:8080/mcp"
@@ -58,3 +82,8 @@ mcp_servers:
   linear:
     url: "https://mcp.linear.app/mcp"
     auth: oauth
+  codegen:
+    url: "https://mcp.codegen.com/mcp"
+    auth: oauth                            # token at ~/.hermes/mcp-tokens/codegen.json;
+                                           # CODEGEN_API_KEY in ~/.hermes/.env (never here)
+    timeout: 120

@@ -108,6 +108,52 @@ services:
   # drives a real sandbox and asserts the load-bearing NEGATIVE test (non-allow-
   # listed CONNECT refused) plus a positive-path check (api.linear.app:443 succeeds).
 
+  # --- Phase 4 (P3): SonarQube Community — code-quality DETECT signal ---
+  # The tech-debt loop's quality signal. SonarQube Community Edition runs an
+  # embedded H2 database (single-node, fine for this scan target) and serves the
+  # Web API at http://localhost:9000. Profile-gated ("sonar") so the default
+  # `docker compose up` is unaffected; bring it up explicitly for the audit:
+  #
+  #   docker compose --profile sonar up -d sonarqube
+  #   # wait for http://localhost:9000/api/system/status -> {"status":"UP"}
+  #   # force a token (admin/admin first login), then scan the cloned demo source
+  #   # (workspaces/microservices-demo/, gitignored) with sonar-scanner, and pull
+  #   # issues/measures via scripts/sonarqube_client.py.
+  #
+  # SonarQube is the DETECT source; graphify is KEPT for cross-service coupling
+  # (SonarQube has no coupling metric). scripts/fuse_signals.py merges SonarQube
+  # issues/measures onto graphify-out/service-coupling.json under an additive
+  # top-level `static_analysis` key (research §7 — the JSON is unvalidated).
+  #
+  # No secret is committed: the admin token minted on first login is persisted to
+  # the gitignored .sonar-token (and/or ~/.hermes); scripts/sonarqube_client.py
+  # reads $SONAR_TOKEN or that file. There is NO graceful degradation — if
+  # SonarQube is unreachable the client/gate FAIL loudly (never fabricate issues).
+  sonarqube:
+    image: sonarqube:community
+    ports:
+      - "${SONAR_HOST_PORT:-9000}:9000"
+    environment:
+      # Single-node embedded H2 is acceptable for this one-shot scan target; skip
+      # the production Elasticsearch bootstrap checks that assume a tuned host.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    healthcheck:
+      # /api/system/status returns {"status":"UP"} once the web server is ready.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    restart: unless-stopped
+    profiles: ["sonar"]
+
 volumes:
   mem0-data:
   rag-index:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:

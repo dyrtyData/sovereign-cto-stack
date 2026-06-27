@@ -1,6 +1,9 @@
 # === Secrets (never commit) ===
 .env
 .env.local
+# SonarQube analysis/user token minted on first login (Phase 4 P3). Persisted
+# locally so scripts/sonarqube_client.py can read it; NEVER committed.
+.sonar-token
 
 # === Riptide / HumanLayer artifacts (cloud-synced symlink target) ===
 .humanlayer/tasks/
