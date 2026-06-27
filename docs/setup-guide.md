@@ -216,9 +216,143 @@ hermes gateway restart
 > reply **proactively called `query_cto_knowledge`** and **cites the grounding book** (e.g.
 > `sam-newman-building-microservices.md`). New sessions pick up the tool after binding.
 
-## Phase 3 — Tech-debt auditor loop
+## Phase 3 — Tech-debt auditor loop (graphify → grounded `[Brownfield]` Linear ticket)
 
-_To be filled in during Phase 3._
+The hackathon hero loop: map the audit target with graphify, derive its service-level
+coupling, have the `CTO-Architecture` profile consult the RAG brain, and file a
+HumanLayer-ready `[Brownfield]` Linear ticket on a cron.
+
+### 1. Map the audit target with graphify
+
+```bash
+bash scripts/run_graphify.sh
+```
+
+This clones `GoogleCloudPlatform/microservices-demo` (Online Boutique) into
+`workspaces/` (**gitignored — never deployed; K8s-only upstream, source-graph only**),
+prunes non-code assets (READMEs / images / html / txt) so the run needs **no LLM API
+key** (a code-only corpus runs fully local via tree-sitter), and writes:
+
+- `graphify-out/graph.json` — the NetworkX AST/call graph (2.5k nodes).
+- `graphify-out/GRAPH_REPORT.md` + `graphify-out/graph.html` — the "god nodes" report
+  and the interactive viz (generated via `graphify cluster-only --no-label`, no LLM).
+- `graphify-out/service-coupling.json` — the **deterministic service-level coupling
+  map** (`scripts/service_topology.py`). The raw graphify graph is file/symbol-level, so
+  the service-to-service topology (how many distinct gRPC backends each service dials)
+  is derived from the gRPC client wiring in the source. Online Boutique's hubs:
+  **frontend = 7 outbound gRPC edges, checkoutservice = 6** (research §13).
+
+> `GRAPHIFY_DEEP=1 bash scripts/run_graphify.sh` adds the semantic/community layer via a
+> configured backend (needs an LLM key). The default AST-only path is offline + deterministic.
+
+Verify the topology, then open the **legible** service-level graph:
+
+```bash
+python3 scripts/assert_graph_topology.py    # PASS: frontend=7, checkoutservice=6
+open graphify-out/service-graph.html        # clean ~11-node service graph (use this)
+```
+
+> `graphify-out/graph.html` is graphify's **raw** file/symbol graph (hundreds of
+> nodes) — accurate but unreadable. `scripts/render_service_graph.py` (run as step 5
+> of `run_graphify.sh`) reads the derived `service-coupling.json` and emits
+> `graphify-out/service-graph.html`: ~11 service nodes, directed gRPC edges, with
+> `frontend` (7 outbound) and `checkoutservice` (6) emphasized by size/color/label.
+> It is self-contained (vis-network from CDN, data embedded), opens standalone in a
+> browser, and is the surface the Phase-4 screen recording captures. Like the other
+> `graphify-out/` outputs it is gitignored; the renderer script is tracked.
+
+### 2. Create the `CTO-Architecture` auditor profile
+
+```bash
+hermes profile create cto-architecture --clone \
+  --description "Tech-debt & architecture auditor: reads the graphify coupling map, consults query_cto_knowledge, files HumanLayer-ready [Brownfield] Linear tickets."
+```
+
+`--clone` copies the orchestrator's `config.yaml` (so the profile inherits the
+`cto_knowledge` **and** `linear` MCP bindings), `.env`, SOUL.md and skills. Then install
+the repo-tracked auditor identity + skill into the profile home:
+
+```bash
+PROF=~/.hermes/profiles/cto-architecture
+cp hermes/profiles/cto-architecture/SOUL.md "$PROF/SOUL.md"     # always-loaded identity slot
+mkdir -p "$PROF/skills/file_brownfield_ticket"
+cp hermes/skills/file_brownfield_ticket.md "$PROF/skills/file_brownfield_ticket/SKILL.md"
+chmod 600 "$PROF/SOUL.md" "$PROF/skills/file_brownfield_ticket/SKILL.md"
+```
+
+> **Re-sync after any edit (same pattern as Phase 2 §4).** The repo is the source of
+> truth; the `~/.hermes` copies are not tracked. Whenever `hermes/SOUL.md`,
+> `hermes/profiles/cto-architecture/SOUL.md`, or `hermes/skills/file_brownfield_ticket.md`
+> changes in the repo, re-run the three `cp`s above **plus** `cp hermes/SOUL.md
+> ~/.hermes/SOUL.md` (the orchestrator identity slot), `chmod 600` them, and restart any
+> running gateway so the supervised surface reloads. The grounding rule — *decompose the
+> question, issue multiple angle queries, cite the union of returned `source_file`s* —
+> lives in all three (orchestrator SOUL, auditor SOUL, the skill) so it holds in every
+> surface and generalizes to the Phase-4 PMF profile.
+
+### 3. Bind Linear to the auditor profile  ⚠️ one-time browser OAuth
+
+```bash
+hermes mcp install linear        # device-code OAuth -> approve in the browser
+hermes mcp test linear           # ✓ Connected, 38 tools
+```
+
+> **Per-profile token gotcha (v0.17.0):** OAuth tokens cache per `HERMES_HOME`. If you
+> approved Linear on the `default` profile but run the auditor as `cto-architecture`, copy
+> the cached token across (same Linear account, already approved) so the auditor can reach
+> Linear in non-interactive (cron / one-shot) runs:
+>
+> ```bash
+> mkdir -p ~/.hermes/profiles/cto-architecture/mcp-tokens
+> cp -p ~/.hermes/mcp-tokens/linear*.json ~/.hermes/profiles/cto-architecture/mcp-tokens/
+> chmod 600 ~/.hermes/profiles/cto-architecture/mcp-tokens/*.json
+> ```
+>
+> **`save_issue`, not `create_issue`:** this Linear MCP server exposes `save_issue` /
+> `list_issues` and uses `team` / `labels` (the human forms of GraphQL `teamId`/`labelIds`).
+> The `Brownfield` label is created once in the workspace (`create_issue_label`), then
+> `save_issue(labels=["Brownfield"])` resolves it by name.
+
+### 4. Run the hero loop (audit → consult RAG → file ticket)
+
+```bash
+hermes -p cto-architecture -z "Run the tech-debt audit loop: read graphify-out/service-coupling.json, identify the highest-degree coupling hub, then GROUND it by issuing MULTIPLE query_cto_knowledge calls — one per dimension (coupling; technical-debt economics/interest; service decomposition & granularity tradeoffs; delivery/throughput performance) — and cite the UNION of the distinct source_file(s) those queries return. Then file ONE HumanLayer-ready [Brownfield] Linear ticket (team 'Global South Ai Safety', labels ['Brownfield'], priority 2) naming the concrete src/<service>/ file(s) with one 'Grounded in:' line per cited source_file. Use the file_brownfield_ticket skill." \
+  --skills file_brownfield_ticket --yolo
+```
+
+The auditor consults `query_cto_knowledge` **before** filing (design Q5), and does so by
+**multi-angle querying**: it decomposes the finding into its dimensions, issues a
+separate query per dimension, and cites the **union** of the distinct corpus
+`source_file`s those queries return — never one query / one citation, never a
+pre-curated title list (let retrieval decide). The resulting ticket names exact files
+(`src/frontend/main.go`, `src/checkoutservice/main.go`, `protos/demo.proto`), the
+measured signal, a refactor proposal, a `Grounded in:` line per cited source, and
+acceptance criteria. For the Online Boutique hub the union includes (among others)
+`software-architecture.md`, `managing-technical-debt.md`,
+`sam-newman-building-microservices.md`, `balancing-coupling-in-software-design.md`,
+`strategic-monoliths-and-microservices.md`, and `accelerate.md`. Verify the filed ticket:
+
+```bash
+python3 scripts/assert_brownfield_ticket.py   # PASS: label + concrete file + multi-source citations
+```
+
+### 5. Schedule the loop on a cron
+
+```bash
+hermes -p cto-architecture cron create "0 9 * * *" \
+  "Run the tech-debt audit loop ... file a [Brownfield] Linear ticket ..." \
+  --name brownfield-tech-debt-audit \
+  --skill file_brownfield_ticket \
+  --workdir "$PWD" \
+  --deliver telegram
+hermes -p cto-architecture cron list           # shows the registered job
+```
+
+> The cron job fires only while the **`cto-architecture` profile's gateway is running**
+> (`hermes -p cto-architecture gateway start`, or `hermes gateway install` as a user
+> service). The job is registered/persisted (`~/.hermes/profiles/cto-architecture/cron/jobs.json`)
+> regardless; the gateway is what ticks it. Keep the laptop plugged in + lid open for
+> scheduled runs.
 
 ## Phase 4 — PMF research profile + `.mp4` recording
 

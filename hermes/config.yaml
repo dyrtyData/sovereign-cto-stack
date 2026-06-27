@@ -32,9 +32,20 @@ gateway:
 # (docker-compose `rag-sidecar`). It exposes one tool, query_cto_knowledge, which the
 # agent must consult before every CTO function and cite (hermes/AGENTS.md rule #1).
 # It appears to the agent as `mcp_cto_knowledge_query_cto_knowledge`.
-# `linear` (Phase 3) is added in its phase.
 #
-# Apply this to the LIVE config from a clean clone with:
+# linear (Phase 3) is the Linear integration over MCP-OAuth 2.1, used by the
+# CTO-Architecture auditor to file [Brownfield] tech-debt tickets. Bind + authorize
+# (one-time browser approval) with:
+#   hermes mcp install linear        # OAuth device-code -> ~/.hermes/mcp-tokens/linear.json
+#   hermes mcp test linear           # ✓ Connected
+# NOTE (v0.17.0): this Linear MCP server exposes `save_issue` / `list_issues`
+# (Linear normalizes GraphQL `teamId`/`labelIds` to `team`/`labels`). A one-shot
+# `-z` session loads cto_knowledge but NOT linear unless the profile has the cached
+# OAuth token — each profile has its own ~/.hermes[/profiles/<name>]/mcp-tokens/.
+# For a non-default auditor profile, copy linear*.json into that profile's
+# mcp-tokens/ (same Linear account, already-approved token).
+#
+# Apply cto_knowledge to the LIVE config from a clean clone with:
 #   hermes mcp add cto_knowledge --url http://localhost:8080/mcp
 #   hermes mcp configure cto_knowledge      # include: query_cto_knowledge
 # (or copy this block into ~/.hermes/config.yaml and run `hermes mcp list` to confirm).
@@ -44,3 +55,6 @@ mcp_servers:
     tools:
       include: [query_cto_knowledge]
     timeout: 60
+  linear:
+    url: "https://mcp.linear.app/mcp"
+    auth: oauth

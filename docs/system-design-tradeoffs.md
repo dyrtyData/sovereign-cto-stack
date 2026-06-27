@@ -128,4 +128,102 @@ The corpus the RAG brain indexes, grouped by the CTO function each domain feeds:
 
 ## Per-phase findings
 
-_Coupling findings (Phase 3) and refactor reasoning are appended here as Phases 3–4 land._
+### Phase 3 — Online Boutique coupling audit (the hero loop)
+
+**What the graph showed.** graphify maps the source of `GoogleCloudPlatform/microservices-demo`
+(Online Boutique) statically (tree-sitter, no deploy). The raw AST graph (2,513 nodes /
+~4,290 edges) is file/symbol-level, so the *service-level* coupling — the signal a CTO
+cares about — is derived deterministically by `scripts/service_topology.py` from the gRPC
+client wiring (`mustConnGRPC(...)` over each `*_SERVICE_ADDR`). The result
+(`graphify-out/service-coupling.json`) reproduces the known topology (research §13):
+
+| Service | Outbound gRPC edges | Wired in |
+|---|---|---|
+| **`frontend`** | **7** (productcatalog, currency, cart, recommendation, shipping, checkout, ad) | `src/frontend/main.go` |
+| **`checkoutservice`** | **6** (shipping, productcatalog, cart, currency, email, payment) | `src/checkoutservice/main.go` |
+| `recommendationservice` | 1 (productcatalog) | `src/recommendationservice/recommendation_server.py` |
+| all others | 0 (leaves) | — |
+
+Two endpoints are deliberately **excluded** from gRPC coupling degree: the OpenTelemetry
+`COLLECTOR_SERVICE_ADDR` (telemetry, not a business service) and `shoppingassistantservice`
+(the newer REST/Flask Gemini+AlloyDB add-on — *not* in the `protos/demo.proto` gRPC
+contract). Counting them would inflate `frontend` to 8; the honest gRPC-coupling number is 7.
+
+**Why it's the tech-debt headline.** `frontend` and `checkoutservice` are the two
+high-efferent-coupling hubs, and *every* edge flows through one shared contract,
+`protos/demo.proto`. That concentrates **change amplification** and **blast radius**: a
+backward-incompatible change to any backend contract ripples into `frontend`, and a
+`demo.proto` change touches all services at once. The grounded refactor (filed as the
+`[Brownfield]` ticket **GLO-8**) is to introduce a backend-for-frontend / anti-corruption
+seam in `frontend` and split `demo.proto` per bounded context so a contract change stops
+fanning out to the whole system.
+
+> _Grounded in (surfaced by `query_cto_knowledge` before the ticket was written, design Q5,
+> via **multi-angle querying** — see the decision below — citing the **union** of the
+> distinct `source_file`s the angle queries returned):
+> *software-architecture.md* — "Coupling levels" / "Service Granularity": efferent coupling
+> (CE) measures how many components this one depends on, and breaking apart a high-CE
+> component reduces change amplification; *managing-technical-debt.md* — "Shining an Economic
+> Spotlight on Technical Debt": coupling debt carries interest paid as friction on every
+> change, with explicit remediation cost/benefit (T4); *sam-newman-building-microservices.md*
+> — "The Interplay of Coupling and Cohesion": a backward-incompatible contract forces upstream
+> consumers to change in lockstep; *balancing-coupling-in-software-design.md* — coupling
+> strength and the distance a change propagates; *strategic-monoliths-and-microservices.md* —
+> right-sizing service granularity and decomposition boundaries; *architecture-for-flow.md* —
+> organizing service boundaries for flow; *accelerate.md* (with *lean-enterprise.md*) —
+> loosely-coupled architecture as a top driver of delivery throughput._
+
+**Decision: derive the service graph deterministically rather than trust raw node degree.**
+graphify's AST graph degree is dominated by intra-file symbol edges (`method`, `contains`,
+`references`), which would not surface the 7/6 service topology directly. A small,
+auditable extractor over the gRPC wiring gives a stable, reviewable signal the auditor and
+the CI assertion (`scripts/assert_graph_topology.py`) both read — and keeps the default run
+fully local (no LLM key) by pruning non-code assets from the throwaway clone.
+
+> _Grounded in: *Accelerate* — fast, reproducible, local feedback loops over opaque tooling._
+
+**Decision: the auditor is a separate `cto-architecture` profile, not the orchestrator.**
+It is cloned from `default` (inheriting both MCP bindings), carries its own auditor
+`SOUL.md` (the always-loaded slot, so the rule survives the supervised gateway's `~/.hermes`
+cwd), and files via the `file_brownfield_ticket` skill. Linear OAuth tokens are per-`HERMES_HOME`,
+so the already-approved token is copied into the profile's `mcp-tokens/` — no second browser
+approval, same account.
+
+> _Grounded in: *An Elegant Puzzle* — specialized roles around a shared coordination surface;
+> *Team Topologies* — a clear, single-responsibility "auditor" capability rather than overloading
+> the orchestrator._
+
+**Decision: ground by MULTI-ANGLE querying and cite the union — never one query / one
+citation, never a pre-curated list.** The first pass of the loop under-cited: the auditor
+issued a single coupling-phrased `query_cto_knowledge` call and the skill hard-coded a curated
+example title list with a "cite at least one source_file" floor — so it cited two texts and
+missed the corpus's most on-point ones (`managing-technical-debt.md`, which is the top hit at
+0.71 for the economics angle, and `software-architecture.md`, which leads on three angles).
+A real CTO finding is multi-dimensional, and one query phrased one way only surfaces one
+slice. The rule is now generalized in all three loaded surfaces (orchestrator `SOUL.md`,
+auditor `SOUL.md`, the `file_brownfield_ticket` skill): **decompose the finding into its
+dimensions, issue one `query_cto_knowledge` call per dimension** (for coupling: coupling,
+technical-debt economics/interest, service decomposition & granularity tradeoffs,
+delivery/throughput performance), **and cite the union of the distinct `source_file`s those
+queries return** — letting retrieval, not a guessed list, decide what is relevant. Re-running
+this against the live RAG endpoint returns 8 distinct sources; GLO-8 now carries a
+`Grounded in:` line for each, every line tied to the dimension it backs. Because the rule
+lives in the orchestrator SOUL too, it applies unprompted to the Phase-4 PMF profile and every
+other CTO function.
+
+> _Grounded in: *Accelerate* — reproducible, evidence-driven feedback over opaque single-shot
+> judgement; *Managing Technical Debt* — making the debt's interest legible (the very text the
+> single-query pass missed)._
+
+**Decision: render a legible service-level graph rather than ship graphify's raw graph as the
+demo surface.** graphify's `graph.html` is the raw file/symbol AST graph (hundreds of nodes) —
+correct, but unreadable and useless for a screen recording. `scripts/render_service_graph.py`
+reads the derived `graphify-out/service-coupling.json` and emits `graphify-out/service-graph.html`:
+~11 service nodes, directed gRPC edges, with `frontend` (7 outbound) and `checkoutservice` (6)
+emphasized by size/color/label and the leaf backends muted. It is self-contained (vis-network
+from CDN, data embedded inline), opens standalone in any browser, and is the surface the Phase-4
+recording captures. The renderer is tracked; its HTML output stays in the gitignored
+`graphify-out/` (a derived artifact, reproducible from `run_graphify.sh` step 5).
+
+> _Grounded in: *Accelerate* — make the signal legible and reproducible; the audit's value is
+> only realized if a human can see the coupling hub at a glance._
