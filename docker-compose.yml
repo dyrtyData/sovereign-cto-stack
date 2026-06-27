@@ -89,34 +89,24 @@ services:
     restart: unless-stopped
     profiles: ["record"]
 
-  # --- Phase 2 (P1): deny-by-default egress CONNECT proxy ---
-  # The runtime enforcement point for the sovereign-egress allow-list. A
-  # stdlib-only HTTP CONNECT forward proxy (egress/egress_proxy.py) that tunnels
-  # ONLY the host:port pairs declared `enforcement: enforce` in egress/policy.yaml
-  # (the reviewable safety artifact), and REFUSES every other CONNECT with
-  # `403 egress-policy-deny` — deny-by-default. Sub-tools route outbound HTTPS
-  # through it via HTTPS_PROXY=http://egress-proxy:8888 (in-VM) or, from the host,
-  # via the published port below.
+  # --- Phase 2 (P1): deny-by-default egress ---
+  # There is intentionally NO egress service here. Egress enforcement is performed
+  # OUT-OF-PROCESS by a real NVIDIA OpenShell sandbox, not by a compose sidecar:
+  # workloads are confined with
   #
-  # Profile-gated (`egress`) so the default stack is undisturbed; the policy file
-  # is mounted READ-ONLY. The gate scripts/assert_egress_policy.py brings this up
-  # and asserts the load-bearing NEGATIVE test (non-allow-listed CONNECT refused)
-  # plus a positive-path check (api.linear.app:443 succeeds). This OPA CONNECT
-  # network layer is independent of the Landlock filesystem layer, so the network
-  # assertion holds even where Landlock `best_effort` degrades on macOS
-  # (docs/system-design-tradeoffs.md).
-  egress-proxy:
-    build:
-      context: ./egress
-    ports:
-      - "${EGRESS_HOST_PORT:-8888}:8888"
-    volumes:
-      - ./egress/policy.yaml:/etc/egress/policy.yaml:ro   # reviewable allow-list, read-only
-    environment:
-      EGRESS_POLICY: /etc/egress/policy.yaml
-      EGRESS_PORT: "8888"
-    restart: unless-stopped
-    profiles: ["egress"]
+  #   openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ -- <cmd>
+  #
+  # The sandbox supervisor (PID 1) auto-injects HTTPS_PROXY and routes every
+  # outbound TLS CONNECT through the OpenShell gateway's OPA proxy
+  # (https://127.0.0.1:17670, a local launchd service). A CONNECT whose host:port
+  # matches an `enforcement: enforce` endpoint in egress/policy.yaml (the reviewable
+  # safety artifact) is tunnelled; any other CONNECT is REFUSED by default
+  # (`curl: (56) CONNECT tunnel failed, response 403`). This OPA CONNECT network
+  # layer is independent of the Landlock filesystem layer, so the deny-by-default
+  # guarantee holds even where Landlock `best_effort` degrades on macOS
+  # (docs/system-design-tradeoffs.md). The gate scripts/assert_egress_policy.py
+  # drives a real sandbox and asserts the load-bearing NEGATIVE test (non-allow-
+  # listed CONNECT refused) plus a positive-path check (api.linear.app:443 succeeds).
 
 volumes:
   mem0-data:

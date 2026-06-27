@@ -1,25 +1,24 @@
-# Deny-by-default egress CONNECT proxy (Phase 2 / P1).
+# Confinable OpenShell sandbox base image (Phase 2 / P1).
 #
-# The runtime enforcement point for the sovereign-egress allow-list. Wraps the
-# stdlib-only egress_proxy.py in a minimal Python image; the reviewable
-# egress/policy.yaml is mounted READ-ONLY at /etc/egress/policy.yaml by
-# docker-compose (service `egress-proxy`, profile `egress`). The proxy refuses any
-# HTTP CONNECT whose host:port is not declared `enforce` in that policy.
+# This is NOT a proxy. It is the base image OpenShell builds and runs the egress
+# gate's probe inside, via:
 #
-# stdlib-only by design (no PyYAML, no third-party deps) so a clean clone builds
-# it with nothing to install — matching the repo's reference-client convention.
-FROM python:3.12-slim
+#   openshell sandbox create --no-keep --policy egress/policy.yaml \
+#     --from egress/ -- sh -c '<curl probes>'
+#
+# OpenShell's supervisor becomes PID 1, auto-injects HTTPS_PROXY, and enforces the
+# network allow-list in egress/policy.yaml against every outbound CONNECT.
+#
+# The image MUST contain:
+#   - iproute2 (the `ip` binary) — required by the OpenShell supervisor to set up
+#     the sandbox network namespace.
+#   - a `sandbox` user/group — the policy's process.run_as_user/run_as_group.
+#   - curl + ca-certificates — the gate's CONNECT probe (negative + positive).
+#
+# Verified building + confining successfully under OpenShell 0.0.71 on Docker
+# Engine 28.1.1 (Docker Desktop 4.41.2) / Apple Silicon.
+FROM debian:bookworm-slim
 
-ENV EGRESS_POLICY=/etc/egress/policy.yaml \
-    EGRESS_PORT=8888
-
-WORKDIR /opt/egress
-COPY egress_proxy.py /opt/egress/egress_proxy.py
-
-EXPOSE 8888
-
-# Healthcheck: the listener is accepting connections on EGRESS_PORT.
-HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
-    CMD python -c "import socket,os,sys; s=socket.socket(); s.settimeout(3); sys.exit(0 if s.connect_ex(('127.0.0.1', int(os.environ.get('EGRESS_PORT','8888'))))==0 else 1)" || exit 1
-
-ENTRYPOINT ["python", "/opt/egress/egress_proxy.py"]
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates iproute2 \
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd -r sandbox && useradd -r -g sandbox -m -d /sandbox sandbox

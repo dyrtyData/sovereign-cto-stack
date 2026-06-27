@@ -317,19 +317,24 @@ delta) — so a black or still recording fails CI.
 The Q3 deferral above is now **partially actioned** as the GLO-13 P1 slice. What landed and
 the honest tradeoffs:
 
-**What's built.** A reviewable allow-list artifact (`egress/policy.yaml`) plus an
-out-of-process enforcement point: a stdlib-only HTTP CONNECT forward proxy
-(`egress/egress_proxy.py`, profile-gated compose service `egress-proxy`) that tunnels **only**
-the `host:port` pairs declared `enforcement: enforce` in the policy (Linear / Telegram /
-Nous-inference / web-scrape) and refuses every other CONNECT with `403 egress-policy-deny`.
-The policy is mounted **read-only**. The gate `scripts/assert_egress_policy.py` proves it.
+**What's built.** A reviewable allow-list artifact (`egress/policy.yaml`) enforced
+out-of-process by a **real NVIDIA OpenShell sandbox** (verified against OpenShell 0.0.71) — not
+a hand-rolled proxy. A workload is confined with
+`openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ -- <cmd>`; the
+sandbox supervisor (PID 1) auto-injects `HTTPS_PROXY` and routes every outbound TLS CONNECT
+through the OpenShell gateway's OPA proxy (`https://127.0.0.1:17670`, a local launchd service).
+A CONNECT whose `host:port` matches an `enforcement: enforce` endpoint in the policy (Linear /
+Telegram / Nous-inference / web-scrape) is tunnelled; every other CONNECT is **refused by
+default** (`curl: (56) CONNECT tunnel failed, response 403`). No `egress-proxy` compose service
+exists — enforcement is the sandbox, and the policy is loaded read-only by OpenShell. The gate
+`scripts/assert_egress_policy.py` drives a real sandbox and proves it.
 
 **Decision: the gate's load-bearing assertion is the NEGATIVE test (Q3-sub, Option β).**
 Deny-by-default is only meaningful if you can demonstrate a denial; a positive-only gate is
-satisfiable by a proxy that blocks nothing. So the gate asserts a CONNECT to a
-non-allow-listed host is **refused** (load-bearing) *and* `api.linear.app:443` **succeeds**
-(positive path — and the existing `assert_brownfield_ticket.py` keeps reaching Linear with
-the proxy up, proving the allow-list doesn't break legitimate egress).
+satisfiable by a sandbox that blocks nothing. So the gate runs both probes inside the confined
+sandbox and asserts a CONNECT to a non-allow-listed host (`example.com:443`) is **refused**
+(load-bearing — curl exit 56 / 403) *and* `api.linear.app:443` **succeeds** (positive path —
+http 200), proving the allow-list doesn't break legitimate egress.
 
 > _Grounded in: *Accelerate* — make safety properties observable and verifiable, not asserted;
 > reproducible feedback over trust._

@@ -6,164 +6,119 @@ you can demonstrate a DENIAL, so this gate's LOAD-BEARING assertion is the NEGAT
 test (design Q3-sub, Option β):
 
   NEGATIVE (load-bearing): a CONNECT to a host that is NOT on the egress/policy.yaml
-    allow-list, routed through the egress proxy, must be REFUSED. If that CONNECT
-    succeeds, the gate FAILS — a proxy that blocks nothing is not deny-by-default.
+    allow-list, made from INSIDE a real NVIDIA OpenShell sandbox confined by that
+    policy, must be REFUSED. If that CONNECT succeeds, the gate FAILS — a sandbox
+    that blocks nothing is not deny-by-default.
 
-  POSITIVE: a CONNECT to an allow-listed host (api.linear.app:443) through the same
-    proxy must SUCCEED — proving the allow-list does not break legitimate egress
-    (this is what lets the existing hero-loop gates keep reaching Linear with the
-    proxy up).
+  POSITIVE: a CONNECT to an allow-listed host (api.linear.app:443) from inside the
+    same sandbox must SUCCEED — proving the allow-list does not break legitimate
+    egress (this is what lets the existing hero-loop gates keep reaching Linear).
 
 The network OPA-CONNECT layer is independent of the Landlock filesystem layer, so
 this assertion stays reliable even where Landlock `best_effort` silently degrades
 on macOS (OpenShell #803 — docs/system-design-tradeoffs.md).
 
-How it gets a proxy to test:
-  1. If something is already listening on the proxy port (EGRESS_HOST_PORT, default
-     8888), it tests that.
-  2. Else, if Docker is available, it brings the compose `egress` profile up
-     (`docker compose --profile egress up -d --build egress-proxy`) and tests the
-     published port. (It leaves the service running unless EGRESS_TEARDOWN=1.)
-  3. Else (no Docker), it starts egress/egress_proxy.py directly on the host as a
-     subprocess against egress/policy.yaml and tests that — so the load-bearing
-     assertion is still checkable in a CI box without Docker.
+How it is enforced (NOT a mock proxy):
+  OpenShell builds the egress/ Dockerfile, creates a `--no-keep` sandbox confined by
+  egress/policy.yaml, and runs the curl probes INSIDE it. The sandbox supervisor
+  (PID 1) auto-injects HTTPS_PROXY and routes every outbound TLS CONNECT through the
+  gateway's OPA proxy (https://127.0.0.1:17670, a local launchd service). An
+  allow-listed CONNECT is tunnelled (curl -> http 200); any other CONNECT is refused
+  (`curl: (56) CONNECT tunnel failed, response 403`).
 
-A successful CONNECT is detected by reading the proxy's HTTP response line: an
-allow-listed target returns `200 Connection established`; a denied target returns
-`403 egress-policy-deny`. The positive check additionally requires that the proxy
-actually opened the upstream tunnel (the `200` line), not merely that the policy
-*would* allow it.
+Detection: both probes run in ONE sandbox command and print machine-parseable
+markers (`NEG_CODE=<http> NEG_EXIT=<n>` / `POS_CODE=<http> POS_EXIT=<n>`). The
+negative target must report curl exit 56 (CONNECT tunnel failed / 403); the positive
+target must report curl exit 0 and an HTTP 200.
+
+Requires: `openshell` on PATH with a Connected gateway (`openshell status`) and a
+running Docker daemon (OpenShell builds + runs the sandbox image through it). If
+OpenShell is unavailable the gate exits 2 (harness error) rather than silently
+passing — a deny-by-default claim that can't be exercised must not be reported PASS.
 
 Exit 0 on PASS, 1 on FAIL, 2 on harness error.
 
 Usage:
   python3 scripts/assert_egress_policy.py
-  EGRESS_HOST_PORT=8888 python3 scripts/assert_egress_policy.py
 """
 from __future__ import annotations
 
 import os
-import socket
+import re
+import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 POLICY = REPO_ROOT / "egress" / "policy.yaml"
-PROXY_SRC = REPO_ROOT / "egress" / "egress_proxy.py"
-
-PROXY_HOST = os.environ.get("EGRESS_PROXY_HOST", "127.0.0.1")
-PROXY_PORT = int(os.environ.get("EGRESS_HOST_PORT", "8888"))
+EGRESS_DIR = REPO_ROOT / "egress"
 
 # A host that MUST NOT be on the allow-list (the negative target). Picked to be a
 # stable, unrelated public host; the assertion is about the REFUSAL, never a real
 # connection to it.
 DENY_HOST = os.environ.get("EGRESS_DENY_HOST", "example.com")
-DENY_PORT = 443
 # An allow-listed host (the positive target) — must match egress/policy.yaml.
 ALLOW_HOST = os.environ.get("EGRESS_ALLOW_HOST", "api.linear.app")
-ALLOW_PORT = 443
+
+# OpenShell sandbox create can take a while on first build; allow a generous budget.
+SANDBOX_TIMEOUT = int(os.environ.get("EGRESS_SANDBOX_TIMEOUT", "300"))
+
+# The probe runs both CONNECTs inside the confined sandbox and prints parseable
+# markers. curl exit 56 == "CONNECT tunnel failed" (the OPA 403 refusal).
+PROBE = (
+    'echo "=NEG=";'
+    f' curl -sS -o /dev/null -w "NEG_CODE=%{{http_code}}" --max-time 20 https://{DENY_HOST} 2>/dev/null;'
+    ' echo " NEG_EXIT=$?";'
+    ' echo "=POS=";'
+    f' curl -sS -o /dev/null -w "POS_CODE=%{{http_code}}" --max-time 20 https://{ALLOW_HOST} 2>/dev/null;'
+    ' echo " POS_EXIT=$?"'
+)
 
 
-def _port_open(host: str, port: int, timeout: float = 1.0) -> bool:
-    s = socket.socket()
-    s.settimeout(timeout)
-    try:
-        return s.connect_ex((host, port)) == 0
-    finally:
-        s.close()
-
-
-def _proxy_responsive(retries: int = 20, delay: float = 0.5) -> bool:
-    """Probe the proxy with a real CONNECT until it returns an HTTP status line.
-
-    A freshly-bound listener (or a Docker port-forward that just opened) can RST
-    the first few connections before the accept loop is serving — `_port_open`
-    returns true a beat before the proxy actually answers. We probe a host the
-    proxy must DENY and wait until it replies with a `403` status line (rather
-    than resetting), which proves the request/response path is live. This removes
-    the startup race so the gate is reliable when it brings the proxy up itself.
-    """
-    for _ in range(retries):
-        established, status = connect_via_proxy(DENY_HOST, DENY_PORT)
-        if status.startswith("HTTP/"):
-            return True
-        time.sleep(delay)
-    return False
-
-
-def connect_via_proxy(target_host: str, target_port: int) -> tuple[bool, str]:
-    """Send an HTTP CONNECT through the proxy. Return (tunnel_established, status_line)."""
-    s = socket.socket()
-    s.settimeout(20)
-    try:
-        s.connect((PROXY_HOST, PROXY_PORT))
-        req = (
-            f"CONNECT {target_host}:{target_port} HTTP/1.1\r\n"
-            f"Host: {target_host}:{target_port}\r\n\r\n"
-        )
-        s.sendall(req.encode())
-        resp = b""
-        while b"\r\n" not in resp and len(resp) < 1024:
-            chunk = s.recv(1024)
-            if not chunk:
-                break
-            resp += chunk
-        status = resp.split(b"\r\n", 1)[0].decode(errors="replace")
-        established = " 200 " in f" {status} " or status.endswith("200 Connection established")
-        return established, status
-    except OSError as e:
-        return False, f"<socket error: {e}>"
-    finally:
-        s.close()
-
-
-def _ensure_proxy() -> tuple[str, subprocess.Popen | None]:
-    """Make a proxy reachable on PROXY_HOST:PROXY_PORT. Return (mode, host_proc)."""
-    if _port_open(PROXY_HOST, PROXY_PORT):
-        print(f"egress gate: proxy already listening on {PROXY_HOST}:{PROXY_PORT}")
-        _proxy_responsive()
-        return "preexisting", None
-
-    docker = subprocess.run(
-        ["docker", "compose", "version"], capture_output=True, cwd=REPO_ROOT
+def _openshell_available() -> tuple[bool, str]:
+    if shutil.which("openshell") is None:
+        return False, "`openshell` not on PATH"
+    status = subprocess.run(
+        ["openshell", "status"], capture_output=True, text=True
     )
-    if docker.returncode == 0:
-        print("egress gate: bringing up compose `egress` profile (egress-proxy)...")
-        up = subprocess.run(
-            ["docker", "compose", "--profile", "egress", "up", "-d", "--build", "egress-proxy"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-        )
-        if up.returncode != 0:
-            print(up.stdout)
-            print(up.stderr, file=sys.stderr)
-            print("egress gate: compose up failed — falling back to host proxy")
-        else:
-            for _ in range(30):
-                if _port_open(PROXY_HOST, PROXY_PORT) and _proxy_responsive():
-                    print(f"egress gate: egress-proxy up on {PROXY_HOST}:{PROXY_PORT}")
-                    return "compose", None
-                time.sleep(1)
-            print("egress gate: compose egress-proxy did not open port in time — host fallback")
+    if status.returncode != 0:
+        return False, "`openshell status` failed (no gateway?)"
+    if "Connected" not in status.stdout:
+        return False, f"OpenShell gateway not Connected:\n{status.stdout.strip()}"
+    return True, status.stdout.strip()
 
-    # Host fallback: run the stdlib proxy directly.
-    print(f"egress gate: starting host proxy {PROXY_SRC.name} on :{PROXY_PORT}")
-    env = {**os.environ, "EGRESS_POLICY": str(POLICY), "EGRESS_PORT": str(PROXY_PORT)}
-    proc = subprocess.Popen(
-        [sys.executable, str(PROXY_SRC)],
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.STDOUT,
+
+def _run_sandbox_probe() -> str:
+    """Build + run the confined sandbox and return its combined stdout/stderr."""
+    cmd = [
+        "openshell", "sandbox", "create",
+        "--no-keep",
+        "--policy", str(POLICY),
+        "--from", str(EGRESS_DIR),
+        "--no-tty",
+        "--", "sh", "-c", PROBE,
+    ]
+    print("egress gate: creating confined OpenShell sandbox "
+          f"(--policy {POLICY.relative_to(REPO_ROOT)} --from egress/)...")
+    proc = subprocess.run(
+        cmd, cwd=REPO_ROOT, capture_output=True, text=True, timeout=SANDBOX_TIMEOUT
     )
-    for _ in range(20):
-        if _port_open(PROXY_HOST, PROXY_PORT) and _proxy_responsive():
-            return "host", proc
-        time.sleep(0.5)
-    proc.terminate()
-    raise RuntimeError("egress gate: could not start any proxy to test")
+    return (proc.stdout or "") + (proc.stderr or "")
+
+
+def _parse(out: str) -> tuple[int | None, int | None, int | None, int | None]:
+    """Extract (neg_code, neg_exit, pos_code, pos_exit) from the probe output."""
+    def _i(pat: str) -> int | None:
+        m = re.search(pat, out)
+        return int(m.group(1)) if m else None
+
+    return (
+        _i(r"NEG_CODE=(\d+)"),
+        _i(r"NEG_EXIT=(\d+)"),
+        _i(r"POS_CODE=(\d+)"),
+        _i(r"POS_EXIT=(\d+)"),
+    )
 
 
 def main() -> int:
@@ -171,51 +126,54 @@ def main() -> int:
         print(f"FAIL: egress policy missing: {POLICY}")
         return 1
 
-    try:
-        mode, host_proc = _ensure_proxy()
-    except RuntimeError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    ok, detail = _openshell_available()
+    if not ok:
+        print(f"ERROR: cannot exercise deny-by-default egress: {detail}", file=sys.stderr)
+        print("       (install OpenShell + start its gateway, or run where Docker+OpenShell exist)",
+              file=sys.stderr)
         return 2
 
-    ok = True
     try:
-        print(f"policy: {POLICY.relative_to(REPO_ROOT)}  (proxy mode: {mode})")
+        out = _run_sandbox_probe()
+    except subprocess.TimeoutExpired:
+        print(f"ERROR: OpenShell sandbox did not finish within {SANDBOX_TIMEOUT}s", file=sys.stderr)
+        return 2
 
-        # --- NEGATIVE (load-bearing): non-allow-listed CONNECT must be REFUSED ---
-        neg_ok, neg_status = connect_via_proxy(DENY_HOST, DENY_PORT)
-        if neg_ok:
-            print(f"FAIL [negative]: CONNECT {DENY_HOST}:{DENY_PORT} was NOT refused "
-                  f"(proxy said: {neg_status!r}) — deny-by-default is NOT enforced")
-            ok = False
-        else:
-            print(f"PASS [negative]: CONNECT {DENY_HOST}:{DENY_PORT} REFUSED "
-                  f"(proxy said: {neg_status!r}) — deny-by-default holds")
+    neg_code, neg_exit, pos_code, pos_exit = _parse(out)
+    if neg_exit is None or pos_exit is None:
+        print("ERROR: could not parse probe markers from sandbox output:", file=sys.stderr)
+        print(out, file=sys.stderr)
+        return 2
 
-        # --- POSITIVE: allow-listed CONNECT must SUCCEED ---
-        pos_ok, pos_status = connect_via_proxy(ALLOW_HOST, ALLOW_PORT)
-        if pos_ok:
-            print(f"PASS [positive]: CONNECT {ALLOW_HOST}:{ALLOW_PORT} ESTABLISHED "
-                  f"(proxy said: {pos_status!r}) — allow-list does not break legitimate egress")
-        else:
-            print(f"FAIL [positive]: CONNECT {ALLOW_HOST}:{ALLOW_PORT} did NOT establish "
-                  f"(proxy said: {pos_status!r}) — allow-listed egress is broken "
-                  f"(or no outbound network to {ALLOW_HOST})")
-            ok = False
-    finally:
-        if host_proc is not None:
-            host_proc.terminate()
-            try:
-                host_proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                host_proc.kill()
-        if mode == "compose" and os.environ.get("EGRESS_TEARDOWN") == "1":
-            subprocess.run(
-                ["docker", "compose", "--profile", "egress", "down"],
-                cwd=REPO_ROOT, capture_output=True,
-            )
+    print(f"policy: {POLICY.relative_to(REPO_ROOT)}  (enforced by real OpenShell sandbox)")
 
-    print("RESULT:", "PASS" if ok else "FAIL")
-    return 0 if ok else 1
+    result_ok = True
+
+    # --- NEGATIVE (load-bearing): non-allow-listed CONNECT must be REFUSED ---
+    # curl exit 56 == "CONNECT tunnel failed" (the OPA 403). Any successful tunnel
+    # (exit 0 / a 2xx) means deny-by-default is NOT enforced.
+    neg_refused = neg_exit != 0 and not (neg_code and 200 <= neg_code < 400)
+    if neg_refused:
+        print(f"PASS [negative]: CONNECT to {DENY_HOST} REFUSED "
+              f"(curl exit {neg_exit}, http {neg_code}) — deny-by-default holds")
+    else:
+        print(f"FAIL [negative]: CONNECT to {DENY_HOST} was NOT refused "
+              f"(curl exit {neg_exit}, http {neg_code}) — deny-by-default is NOT enforced")
+        result_ok = False
+
+    # --- POSITIVE: allow-listed CONNECT must SUCCEED ---
+    pos_ok = pos_exit == 0 and bool(pos_code) and 200 <= pos_code < 400
+    if pos_ok:
+        print(f"PASS [positive]: CONNECT to {ALLOW_HOST} ESTABLISHED "
+              f"(curl exit {pos_exit}, http {pos_code}) — allow-list does not break legitimate egress")
+    else:
+        print(f"FAIL [positive]: CONNECT to {ALLOW_HOST} did NOT establish "
+              f"(curl exit {pos_exit}, http {pos_code}) — allow-listed egress is broken "
+              f"(or no outbound network to {ALLOW_HOST})")
+        result_ok = False
+
+    print("RESULT:", "PASS" if result_ok else "FAIL")
+    return 0 if result_ok else 1
 
 
 if __name__ == "__main__":

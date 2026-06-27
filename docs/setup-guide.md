@@ -489,32 +489,34 @@ python3 scripts/verify_recording.py recordings/run_hero_<ts>.mp4   # RESULT: PAS
 ## Backlog P1 — Deny-by-default egress hardening (the sovereign safety layer)
 
 The headline "sovereign"/safety layer: a reviewable allow-list (`egress/policy.yaml`)
-enforced out-of-process by a CONNECT proxy that **refuses every outbound destination not
-on the list**. This turns the sovereignty claim into an enforced property whose
-load-bearing proof is a **denial you can watch happen** (design Q3-sub, Option β).
+enforced out-of-process by a **real NVIDIA OpenShell sandbox** that **refuses every outbound
+destination not on the list**. This turns the sovereignty claim into an enforced property
+whose load-bearing proof is a **denial you can watch happen** (design Q3-sub, Option β).
 
-> **Prerequisite — Docker Desktop ≥ 4.60.0.** The egress layer runs inside the Docker
-> Desktop LinuxKit VM on Apple Silicon (design Q3-main); 4.60.0+ is the confirmed-viable
-> baseline. No external account or API key is required — the layer is fully local
-> (`egress-proxy` + `egress/policy.yaml`). The optional `EGRESS_HOST_PORT` in `.env`
-> (default `8888`) is ungated — `preflight.sh` is unchanged.
+> **Prerequisite — OpenShell + Docker.** The egress layer is enforced by NVIDIA OpenShell
+> (verified against `0.0.71`) with a Connected gateway (`openshell status`) and a running
+> Docker daemon (OpenShell builds + runs the confined sandbox image through it). Verified on
+> Docker Engine 28.1.1 (Docker Desktop 4.41.2) / Apple Silicon. No external account or API
+> key is required — the layer is fully local (`openshell` + `egress/policy.yaml`).
 
 ### 1. Review the allow-list
 
 `egress/policy.yaml` is the single auditable artifact: each `network_policies` block
 (`linear_api`, `telegram_api`, `nous_inference`, `web_scrape`) names the exact `host:port`
-endpoints permitted, with `enforcement: enforce`. Node agents additionally whitelist
-`/usr/local/bin/node` on the filesystem layer. Everything not listed is denied.
+endpoints permitted, with `enforcement: enforce`. The `filesystem_policy` / `landlock`
+blocks confine reads/writes. Everything not listed on the network allow-list is denied.
 
-### 2. Bring up the egress proxy (profile-gated)
+### 2. Confine a workload in the sandbox
 
-The egress service is behind the `egress` compose profile so it does not disturb the
-default stack. The policy file is mounted **read-only**:
+OpenShell builds the `egress/` Dockerfile and runs the workload INSIDE a sandbox bound to
+the policy. The supervisor (PID 1) auto-injects `HTTPS_PROXY` and routes every outbound TLS
+CONNECT through the gateway's OPA proxy:
 
 ```bash
 git config core.hooksPath .githooks                       # (Phase 0) tracked secret gate
-docker compose --profile egress up -d --build egress-proxy
-docker compose --profile egress logs egress-proxy         # prints the loaded allow-list
+openshell status                                          # gateway must be Connected
+openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
+  -- sh -c 'curl -sS https://api.linear.app'              # allow-listed: tunnels through
 ```
 
 ### 3. Verify deny-by-default (negative + positive)
@@ -524,9 +526,9 @@ python3 scripts/assert_egress_policy.py    # PASS: non-allow-listed CONNECT refu
 ```
 
 The gate's **load-bearing** assertion is the **negative** test — a CONNECT to a host that
-is *not* on the allow-list is **refused** (`403 egress-policy-deny`) — plus a positive-path
-check that `api.linear.app:443` **succeeds** (`200 Connection established`). A
-positive-only check would be satisfiable by a proxy that blocks nothing, so the negative
+is *not* on the allow-list is **refused** (`curl: (56) CONNECT tunnel failed, response 403`)
+— plus a positive-path check that `api.linear.app:443` **succeeds** (http `200`). A
+positive-only check would be satisfiable by a sandbox that blocks nothing, so the negative
 test is what makes the assertion meaningful. The network CONNECT layer is independent of
 the Landlock filesystem layer, so this assertion holds even where Landlock `best_effort`
 degrades on macOS (see [system-design-tradeoffs.md](./system-design-tradeoffs.md)).
@@ -534,14 +536,16 @@ degrades on macOS (see [system-design-tradeoffs.md](./system-design-tradeoffs.md
 You can watch the denial by hand (the dramatic beat captured for the showcase video):
 
 ```bash
-curl -x http://127.0.0.1:8888 https://example.com        # CONNECT tunnel failed, response 403
-curl -x http://127.0.0.1:8888 https://api.linear.app      # 200 — allow-listed, tunnels through
+openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
+  -- sh -c 'curl -sS https://example.com'       # curl: (56) CONNECT tunnel failed, response 403
+openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ \
+  -- sh -c 'curl -sS -o /dev/null -w "%{http_code}\n" https://api.linear.app'   # 200 — allow-listed
 ```
 
-> **Routing sub-tools through the proxy:** containerized sub-tools opt in with
-> `HTTPS_PROXY=http://egress-proxy:8888` (in-VM service name) so all their outbound HTTPS
-> is policy-evaluated. The default stack does not route through it; the proxy + gate exist
-> to *prove and enforce* the allow-list, and to ship the reviewable `policy.yaml` artifact.
+> **Confining sub-tools:** any sub-tool is policy-evaluated by running it inside the sandbox
+> (the supervisor injects `HTTPS_PROXY` automatically) so all its outbound HTTPS is checked
+> against the allow-list. The default stack does not route through it; the sandbox + gate
+> exist to *prove and enforce* the allow-list, and to ship the reviewable `policy.yaml`.
 
 ## End-to-end setup from a clean clone (the full walkthrough)
 
