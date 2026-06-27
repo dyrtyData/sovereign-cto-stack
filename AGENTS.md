@@ -31,6 +31,19 @@ handoffs (`kanban_complete()` returns `summary` + `metadata`).
 4. **Static analysis only for the audit target.** Online Boutique is analyzed as a source
    graph — never deployed.
 5. **Small, verifiable steps.** Each phase boots and is verified before the next begins.
+6. **Living docs updated every phase/commit.** Update `docs/setup-guide.md` (the
+   repeatable clean-clone setup) **and** `docs/system-design-tradeoffs.md` (the cited
+   decision record) as part of each phase/commit — both must stay reproducible from a
+   fresh clone.
+7. **Snapshot filed Linear tickets into `tickets/`.** Every `[Brownfield]`/`[Product]`/
+   `[Full-Build]` ticket filed is persisted to `tickets/<ID>.md` (via
+   `scripts/snapshot_tickets.py` / `scripts/snapshot_after_run.sh`) so the repo's
+   decision record is self-contained — git history, not an external tracker, is the
+   source of truth.
+8. **gitleaks-clean, public-repo-safe, before every commit.** Run `gitleaks` (enforced by
+   the tracked `.githooks/pre-commit` hook — enable once per clone with
+   `git config core.hooksPath .githooks`). Never stage secrets, symlink targets, or
+   large binaries; the repo is public.
 
 ## Memory
 

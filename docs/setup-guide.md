@@ -8,10 +8,11 @@ in incrementally as that phase is built and verified.
 
 ## Phase 0 — Repo skeleton & prerequisites gate
 
-1. Clone and enter the repo:
+1. Clone and enter the repo, then enable the tracked secret-gate hook:
    ```bash
    git clone https://github.com/dyrtyData/sovereign-cto-stack.git
    cd sovereign-cto-stack
+   git config core.hooksPath .githooks   # enables .githooks/pre-commit (gitleaks gate)
    ```
 2. Create your local environment file and fill in real values:
    ```bash

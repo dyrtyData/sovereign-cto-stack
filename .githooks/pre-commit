@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Tracked pre-commit hook — public-repo secret gate (AGENTS.md rule 8).
+# Enable once per clone:  git config core.hooksPath .githooks
+#
+# Fails the commit if gitleaks finds a secret in the staged changes. Fails CLOSED
+# if gitleaks is not installed — the whole point is that a public repo never leaks
+# a credential, so "can't scan" must block, not silently pass.
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks not found — install it before committing (brew install gitleaks)." >&2
+  echo "            (This repo is public; the secret gate fails closed.)" >&2
+  exit 1
+fi
+
+if ! gitleaks protect --staged --no-banner; then
+  echo "pre-commit: gitleaks found a potential secret in the staged changes — commit blocked." >&2
+  echo "            Remove the secret (use .env, which is gitignored) and re-stage." >&2
+  exit 1
+fi
+
+echo "pre-commit: gitleaks clean."
