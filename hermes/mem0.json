@@ -1,0 +1,39 @@
+{
+  "_comment": "mem0 provider behavioral config (tracked reference). Hermes reads $HERMES_HOME/mem0.json. Primary mode is self-hosted OSS on pgvector (the docker-compose mem0-postgres service). Platform fallback: set MEM0_API_KEY in ~/.hermes/.env and switch mode to 'platform' (design Q6). Secrets are NEVER stored here.",
+  "mode": "oss",
+  "user_id": "sovereign-cto",
+  "agent_id": "orchestrator",
+  "rerank": false,
+  "oss_config": {
+    "_comment": "Self-hosted mem0 SDK against pgvector. Embedder is a local HuggingFace model (no external key required); the LLM fact-extractor uses the local Ollama endpoint. Swap embedder/llm to openai by adding the keys to ~/.hermes/.env if preferred.",
+    "vector_store": {
+      "provider": "pgvector",
+      "config": {
+        "host": "127.0.0.1",
+        "port": 5433,
+        "user": "mem0",
+        "password": "mem0",
+        "dbname": "vector_store",
+        "collection_name": "memories",
+        "embedding_model_dims": 384
+      }
+    },
+    "embedder": {
+      "provider": "huggingface",
+      "config": {
+        "model": "sentence-transformers/all-MiniLM-L6-v2"
+      }
+    },
+    "llm": {
+      "provider": "ollama",
+      "config": {
+        "model": "qwen2.5-coder:14b",
+        "ollama_base_url": "http://localhost:11434"
+      }
+    }
+  },
+  "platform_fallback": {
+    "_comment": "Used only if mode is switched to 'platform'. Reads MEM0_API_KEY from env.",
+    "mode": "platform"
+  }
+}
