@@ -36,6 +36,14 @@ brief** that a founder or CTO could act on.
    - states the product/market question and the target customer,
    - summarizes the web signal (what the market is actually doing),
    - applies the corpus frameworks to interpret that signal,
+   - **grounds the AARRR Revenue & Retention legs in REAL Stripe data** — when
+     `recordings/stripe_metrics.json` is present (written by
+     `scripts/stripe_client.py` from real Stripe test-mode subscriptions), the
+     Revenue and Retention cells MUST cite its concrete MRR / ARR / churn /
+     per-cohort retention numbers and emit a `Grounded in: stripe_metrics.json (…)`
+     line — never competitor-pricing assumptions. Assumption-grounded revenue is
+     the explicit fallback ONLY when the artifact is genuinely absent (design Q4
+     Option B),
    - carries a **grounding citation** — one `Grounded in: <source_file> (...)` line
      per distinct corpus text my multi-angle queries returned, and
    - ends with a clear recommendation + the riskiest assumption to test next.

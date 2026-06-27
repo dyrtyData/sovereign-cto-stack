@@ -68,6 +68,29 @@ RECOMMENDATION=""
 
 if [ "${NO_AGENT:-0}" = "1" ]; then
   log "NO_AGENT=1 — writing a deterministic stub brief (exercises lifecycle + citation)"
+
+  # Phase 3: ground the AARRR Revenue & Retention legs in REAL Stripe test-mode
+  # metrics. Refresh recordings/stripe_metrics.json from the live Stripe API (the
+  # client FAILS loudly if the sandbox is empty / key is missing — no fabrication),
+  # then render the concrete numbers into the stub brief's AARRR section.
+  log "refreshing recordings/stripe_metrics.json from real Stripe test-mode data"
+  python3 "$REPO_ROOT/scripts/stripe_client.py" >/dev/null || {
+    echo "pmf_kanban_run: stripe_client.py failed — cannot ground AARRR in real data." >&2
+    echo "  seed the sandbox first: python3 scripts/stripe_seed.py" >&2
+    exit 1
+  }
+  AARRR_MD="$(python3 - "$REPO_ROOT/recordings/stripe_metrics.json" <<'PY'
+import json, sys, pathlib
+m = json.loads(pathlib.Path(sys.argv[1]).read_text())
+mrr = m["mrr"]; arr = m["arr"]; active = m["active_subs"]
+churn = m["churn"]["rate"]; canceled = m["canceled_subs"]
+coh = ", ".join(f"{c['cohort']} {round(c['retention']*100)}%" for c in m["cohorts"])
+print(f"- **Revenue:** MRR ${mrr:,.0f}/mo (ARR ${arr:,.0f}) across {active} active subscriptions.")
+print(f"- **Retention / churn:** lifetime churn {round(churn*100)}%, {canceled} canceled; per-cohort retention {coh}.")
+print(f"- Interpretation: the latest cohort retains best while older cohorts show real churn — revenue is small but the retention trend supports the wedge.")
+PY
+)"
+
   cat > "$BRIEF" <<EOF
 # PMF Brief — $QUESTION
 
@@ -85,11 +108,16 @@ discipline says the riskiest assumption is whether teams will act on an
 agent-filed ticket without a human re-deriving it. Growth-loop thinking points to
 the audit -> ticket -> merged-PR loop as the compounding retention mechanic.
 
+## AARRR Revenue & Retention (Stripe-grounded)
+(real figures from recordings/stripe_metrics.json — not competitor-pricing assumptions)
+$AARRR_MD
+
 ## Grounded in
 Grounded in: the-lean-product-playbook.md (Product-Market Fit Pyramid — target customer, underserved needs, value proposition).
 Grounded in: hacking-growth.md (north-star metric and the experiment cadence behind a growth loop).
 Grounded in: lean-enterprise.md (validated learning / build-measure-learn under uncertainty).
 Grounded in: trustworthy-online-controlled-experiments.md (designing a trustworthy test of the riskiest assumption).
+Grounded in: stripe_metrics.json (real Stripe test-mode MRR/ARR, churn rate, and per-month cohort retention — the Revenue & Retention legs of the AARRR funnel).
 
 ## Recommendation
 Pursue a narrow wedge: grounded [Brownfield] refactor tickets for gRPC coupling

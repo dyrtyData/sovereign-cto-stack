@@ -46,6 +46,29 @@ assumption to test next.
    nothing relevant for a given angle, say so for that angle — do not invent
    grounding.
 
+3. **Ground AARRR Revenue & Retention in REAL Stripe data (design Q4 Option B).**
+   The Revenue and Retention legs of the AARRR funnel MUST be grounded in actual
+   revenue, never in competitor-pricing assumptions like "$20–$600/user/month".
+   Before writing the Revenue & Retention section, read the Stripe metrics
+   artifact at `recordings/stripe_metrics.json` (produced by
+   `scripts/stripe_client.py` from real Stripe **test-mode** subscriptions):
+
+   ```bash
+   python3 scripts/stripe_client.py        # (re)writes recordings/stripe_metrics.json
+   cat recordings/stripe_metrics.json
+   ```
+
+   The artifact is `{mrr, arr, active_subs, canceled_subs, churn:{rate,…},
+   cohorts:[{cohort,active,canceled,retention,mrr}]}`. Use the **concrete numbers**
+   — MRR, ARR, lifetime churn rate, and per-month cohort retention — as the
+   Revenue/Retention evidence, and emit a literal
+   `Grounded in: stripe_metrics.json (real test-mode MRR/churn/cohorts — …)` line
+   citing it. This is REQUIRED whenever the artifact is present; do NOT fall back
+   to assumption-based revenue numbers when real Stripe metrics exist. (If the
+   artifact is genuinely absent, say so and use assumption-grounding as the
+   explicit fallback — but the artifact should be present after the Stripe client
+   runs.)
+
 ## Write the brief to a file
 
 Write the brief as Markdown to a path the recorder/verifier can read back. Prefer:
@@ -66,14 +89,21 @@ The brief MUST contain, in order:
    URLs you scraped. Concrete, not hand-wavy.
 3. **Framework analysis** — apply the corpus frameworks to interpret the signal
    (problem/solution fit, sizing, experimentation, growth).
-4. **Grounding** — for **every distinct `source_file` your multi-angle queries
+4. **AARRR Revenue & Retention (Stripe-grounded)** — the Revenue and Retention
+   legs of the pirate-metrics (AARRR) funnel, grounded in the concrete numbers
+   from `recordings/stripe_metrics.json`: current **MRR / ARR**, the **churn
+   rate**, and **per-month cohort retention**. Reference the real figures (e.g.
+   "MRR $1,281/mo; lifetime churn 25%; latest cohort retention 100%"), NOT
+   competitor-pricing assumptions. Carry a `Grounded in: stripe_metrics.json (…)`
+   line for this section (see Grounding below).
+5. **Grounding** — for **every distinct `source_file` your multi-angle queries
    returned that supports the brief**, a literal line
    `Grounded in: <source_file> (<what THIS text backs>)` tying that source to the
    dimension it grounds. Cite the union — never pre-curate or guess. The string
    `Grounded in:` MUST appear verbatim, once per cited source. At least one cited
    `source_file` must be a real corpus `*.md` (e.g. `the-lean-product-playbook.md`).
-5. **Recommendation** — a clear call.
-6. **Riskiest assumption to test next** — the single experiment to run.
+6. **Recommendation** — a clear call.
+7. **Riskiest assumption to test next** — the single experiment to run.
 
 ### Template
 
@@ -91,6 +121,13 @@ The brief MUST contain, in order:
 <2–4 paragraphs interpreting the signal through the corpus frameworks:
 problem/solution fit, market sizing, experimentation, growth loops>
 
+## AARRR Revenue & Retention (Stripe-grounded)
+(real figures from recordings/stripe_metrics.json — NOT competitor-pricing assumptions)
+- **Revenue:** MRR $<mrr>/mo (ARR $<arr>) across <active_subs> active subscriptions.
+- **Retention / churn:** lifetime churn <churn.rate>%, <canceled_subs> canceled of
+  <active+canceled>; per-cohort retention <e.g. 2026-04 60%, 2026-05 75%, 2026-06 100%>.
+- Interpretation: <what the revenue + cohort-retention trend implies for the bet>.
+
 ## Grounded in
 (one line per distinct source_file the multi-angle queries returned — cite the union)
 Grounded in: the-lean-product-playbook.md (Product-Market Fit Pyramid — target
@@ -101,6 +138,8 @@ Grounded in: lean-enterprise.md (validated learning and build-measure-learn unde
 uncertainty).
 Grounded in: trustworthy-online-controlled-experiments.md (designing trustworthy
 A/B tests to validate the riskiest assumption).
+Grounded in: stripe_metrics.json (real Stripe test-mode MRR/ARR, churn rate, and
+per-month cohort retention — the Revenue & Retention legs of the AARRR funnel).
 
 ## Recommendation
 <the call>
