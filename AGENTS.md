@@ -31,10 +31,14 @@ handoffs (`kanban_complete()` returns `summary` + `metadata`).
 4. **Static analysis only for the audit target.** Online Boutique is analyzed as a source
    graph — never deployed.
 5. **Small, verifiable steps.** Each phase boots and is verified before the next begins.
-6. **Living docs updated every phase/commit.** Update `docs/setup-guide.md` (the
-   repeatable clean-clone setup) **and** `docs/system-design-tradeoffs.md` (the cited
-   decision record) as part of each phase/commit — both must stay reproducible from a
-   fresh clone.
+6. **Living docs updated every phase/commit.** As part of each phase/commit, update the
+   living docs so a fresh clone stays reproducible and the story stays current:
+   `README.md` (the front-door overview — components, build phases, repo layout),
+   `docs/setup-guide.md` (the repeatable clean-clone setup), **and**
+   `docs/system-design-tradeoffs.md` (the cited decision record). Also update
+   `docs/cto-functions.md` whenever the CTO-function ↔ corpus mapping changes. If a commit
+   changes `scripts/`, `docker-compose.yml`, `hermes/`, or `egress/`, the matching doc(s) —
+   including `README.md` — change in the SAME commit, not a deferred closeout.
 7. **Snapshot filed Linear tickets into `tickets/`.** Every `[Brownfield]`/`[Product]`/
    `[Full-Build]` ticket filed is persisted to `tickets/<ID>.md` (via
    `scripts/snapshot_tickets.py` / `scripts/snapshot_after_run.sh`) so the repo's
