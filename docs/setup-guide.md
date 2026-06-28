@@ -781,17 +781,64 @@ python3 scripts/build_showcase_video.py                 # -> recordings/showcase
 python3 scripts/assert_showcase_video.py                # PASS: valid non-static concat + >= the guaranteed hero loop(s)
 ```
 
-> **P0 ticket-in-browser ending (fixed here).** The throwaway container Chromium has no Linear
-> session, so navigating to the live ticket URL hit Linear's **auth wall**.
+> **P0 ticket-in-browser ending (the reproducible default).** The throwaway container Chromium has
+> no Linear session, so navigating to the live ticket URL hit Linear's **auth wall**.
 > `scripts/render_ticket_card.py` renders the tracked local `tickets/<ID>.md` snapshot to a
 > self-contained `file://` HTML, and `record_run.sh` ends the hero capture on **that** page — the
-> filed ticket visible in the browser, no auth. The real-Linear-UI ending (a persistent
-> authenticated Chromium profile) is rolled forward to [GLO-14](../tickets/GLO-14.md).
+> filed ticket visible in the browser, no auth. This stays the **default** ending; the optional
+> authenticated live-Linear ending is the GLO-14 P3 add-on below.
 
 > **Title cards** are self-contained single-file HTML (`scripts/render_title_card.py`, the
 > `render_service_graph.py` house style) painted onto `:99`; `build_showcase_video.py` renders them
 > to short clips (headless-browser PNG, with an ffmpeg-drawtext fallback) and normalizes every clip
 > to a common WxH/fps/codec so the demuxer concat is safe across heterogeneous sources.
+
+### GLO-14 P3 — fuller multi-component montage, memory view, optional authenticated ending
+
+`build_showcase_video.py`'s catalogue now tells the **D-2 segment story**: the visual hero loop +
+the Stripe/egress/PMF data surfaces (included when their artifact exists) + **four always-rendered
+title-carded chapters** — the **mem0 memory view**, the **Kanban** create→claim→complete lifecycle,
+the **Greptile** PR-review instruction, and the **Linear ticket ending**. `assert_showcase_video.py`
+now requires those D-2 segments (`SHOWCASE_MIN_SEGMENTS=5` + a required-id check; override via
+`SHOWCASE_REQUIRED_IDS` for a deliberately smaller montage).
+
+**Read-only memory view (P1 made visible).** `scripts/render_memory_card.py` queries the unified
+`memories` rows + mem0-native entity links and renders them to a self-contained `file://` HTML
+(the `render_ticket_card.py` marked.js card pattern — read-only, no auth, no writes):
+
+```bash
+docker compose up -d mem0-postgres
+uv run scripts/render_memory_card.py --out recordings/memory_<ts>.html   # the read-only view
+uv run scripts/assert_memory_view_grows.py                               # scripts "more rows after a loop"
+```
+
+`assert_memory_view_grows.py` renders the card with `--baseline` (BEFORE), runs one decision
+through the real `mem0_record_decision` write path, renders again `--against` that baseline
+(AFTER), and asserts the parsed row count **strictly grew** and the after-card highlights the new
+row. It runs against a throwaway isolated collection (never pollutes the live `memories`).
+
+**Optional authenticated live-Linear ending.** The default ending stays the `file://` snapshot.
+To end instead on the **real** logged-in Linear ticket UI:
+
+```bash
+# 1. populate the gitignored persistent Chromium profile ONCE (needs your click — log in to Linear):
+chromium --user-data-dir="$PWD/recorder-profile"          # then sign in to Linear in that window, quit
+# 2. record with the live ending enabled (a persistent profile is bind-mounted into the recorder):
+TICKET_LIVE_URL=1 bash scripts/record_run.sh hero
+```
+
+`docker-compose.yml` bind-mounts `./recorder-profile` → `/recorder-profile` (gitignored — it holds
+a live session, **never committed**, AGENTS.md rule 3/8); `record_run.sh`'s `TICKET_LIVE_URL=1`
+block resolves the filed ticket URL and launches the right-pane browser **with**
+`--user-data-dir=/recorder-profile` so the session carries into the capture. Without a populated
+profile Chromium still hits the auth wall, so the snapshot ending remains the safe default.
+
+> **What is automated vs. human here.** The default `file://` path and the persistent-profile
+> **wiring** are both gated: `assert_persistent_profile_wiring.py` drives the real `launch_browser`
+> path with a throwaway `--user-data-dir` and asserts the recorder launched Chromium **with** the
+> flag (no real Linear session needed). Two things stay genuinely human: eyeballing that a
+> *real-session* recording ends on the actual authenticated Linear page, and the collaborative final
+> montage segment ordering (design D-2 micro-detail).
 
 ## End-to-end setup from a clean clone (the full walkthrough)
 

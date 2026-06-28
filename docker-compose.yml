@@ -81,9 +81,21 @@ services:
       SCREEN_H: "720"
       SCREEN_D: "24"
       REC_DIR: /recordings
+      # GLO-14 P3 (OPTIONAL): when set, launch_browser launches Chromium WITH this
+      # --user-data-dir so a persistent, AUTHENTICATED Linear session carries into the
+      # capture (the live-Linear ending). EMPTY by default -> throwaway/sessionless
+      # browser -> the reproducible file:// snapshot ending is unchanged. Populated by
+      # scripts/record_run.sh's TICKET_LIVE_URL=1 path; the mounted dir is gitignored
+      # (no session secrets committed — AGENTS.md rule 3/8).
+      CHROMIUM_USER_DATA_DIR: "${CHROMIUM_USER_DATA_DIR:-}"
     volumes:
       - ./recordings:/recordings          # host-readable .mp4 output (gitignored)
       - ./graphify-out:/graphify-out:ro   # the legible service-graph.html surface
+      # Persistent authenticated Chromium profile for the OPTIONAL live-Linear ending
+      # (GLO-14 P3). A HOST bind-mount so a human can log into Linear once and keep the
+      # session; GITIGNORED so no session cookies/secrets are ever committed. Empty/
+      # absent on a clean clone -> the default file:// snapshot ending stands.
+      - ./recorder-profile:/recorder-profile   # gitignored persistent Chromium profile
     # Larger /dev/shm so chromium renders the surface without crashing.
     shm_size: "512m"
     restart: unless-stopped

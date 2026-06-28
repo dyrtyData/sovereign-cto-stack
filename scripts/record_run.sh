@@ -341,12 +341,22 @@ if [ "${NO_AGENT:-0}" != "1" ] && ! is_segment "$JOB" && command -v python3 >/de
   fi
 fi
 
-# --- 5b-legacy. (disabled) live Linear URL navigation hit the auth wall -------
-# Kept for reference: resolving the live ticket URL over the Linear MCP and
-# navigating Chromium to it. The container browser is unauthenticated, so Linear
-# renders its login page (not the ticket). Superseded by the local-snapshot HTML
-# ending above. Set TICKET_LIVE_URL=1 to opt back into the (auth-walled) behavior.
+# --- 5c. OPTIONAL authenticated live-Linear ending (GLO-14 P3, TICKET_LIVE_URL=1) -
+# The DEFAULT reproducible ending is the local file:// snapshot painted in 5b above;
+# it needs no session and always passes verify_recording.py. This OPT-IN path ends
+# the capture on the REAL authenticated Linear ticket UI instead — enabled ONLY when
+# TICKET_LIVE_URL=1 AND a PERSISTENT, AUTHENTICATED Chromium profile is mounted
+# (CHROMIUM_USER_DATA_DIR, default ./recorder-profile -> /recorder-profile, see
+# docker-compose.yml). We resolve the filed ticket URL over the Linear MCP, then
+# launch the right-pane browser WITH that --user-data-dir so the logged-in session
+# carries into the capture and the live ticket renders (not the auth wall). The
+# profile dir is gitignored — no session secrets are committed (AGENTS.md rule 3/8).
+# A human must populate the profile once (chromium --user-data-dir=... + log in to
+# Linear); without it Chromium hits the auth wall, so we keep the snapshot ending as
+# the painted default and treat this as additive.
+RECORDER_PROFILE_DIR_IN_CTR="${RECORDER_PROFILE_DIR_IN_CTR:-/recorder-profile}"
 if [ "${TICKET_LIVE_URL:-0}" = "1" ] && [ "${NO_AGENT:-0}" != "1" ] && command -v python3 >/dev/null 2>&1; then
+  log "TICKET_LIVE_URL=1 — attempting the OPTIONAL authenticated live-Linear ending (persistent profile)"
   log "resolving filed ticket URL to navigate the right pane (file->ticket ending)"
   TICKET_URL="$(JOB="$JOB" python3 - <<'PY' 2>/dev/null || true
 import os, sys
@@ -371,12 +381,17 @@ except Exception:
 PY
 )"
   if [ -n "$TICKET_URL" ]; then
-    log "navigating right pane to filed ticket: $TICKET_URL"
-    rexec navigate "$TICKET_URL" || log "navigate failed (non-fatal) — capture continues"
+    log "navigating right pane to filed ticket WITH persistent profile ($RECORDER_PROFILE_DIR_IN_CTR): $TICKET_URL"
+    # Launch the right-pane browser with the mounted authenticated profile so the
+    # live Linear ticket renders (not the auth wall). We pass CHROMIUM_USER_DATA_DIR
+    # into the recorder for THIS exec; launch_browser appends --user-data-dir when set.
+    dc exec -T -e "CHROMIUM_USER_DATA_DIR=$RECORDER_PROFILE_DIR_IN_CTR" "$SVC" "$EXEC" \
+        navigate "$TICKET_URL" \
+      || log "authenticated navigate failed (non-fatal) — capture continues on the snapshot ending"
     # hold a few seconds so the ticket page renders into the capture before stop
     sleep "${TICKET_HOLD_SECONDS:-6}"
   else
-    log "no filed ticket URL resolved — skipping file->ticket navigation (capture still ships)"
+    log "no filed ticket URL resolved — skipping live navigation (the file:// snapshot ending stands)"
   fi
 fi
 

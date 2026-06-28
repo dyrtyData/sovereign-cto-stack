@@ -700,6 +700,66 @@ invariants are untouched — `shipped` and `shipped_result` are additive fields)
 > against a real revenue/retention metric, not a self-asserted flag; *Accelerate* —
 > deterministic, reproducible, gate-able state changes over hand edits._
 
+### GLO-14 P3 / D-2 — Fuller multi-component demo + read-only memory view + optional authenticated Linear ending (built)
+
+**Decision (design D-2: Option A montage spine + Option B lightweight memory view).** The recorded
+demo previously surfaced only two surfaces (a tool-call log + the coupling graph) and ended on a
+locally-rendered ticket snapshot. This slice makes the montage show **more of the stack** and adds a
+cheap read-only memory view, while keeping every default path **reproducible from a clean clone**.
+
+**The D-2 segment list (what the montage now tells).** `build_showcase_video.py`'s `catalogue()`
+was extended so the montage reads as the fuller story: the visual hero loop + the existing
+artifact-backed data surfaces (egress **403** refusal, Stripe MRR/churn, SonarQube fusion, the
+RICE ledger incl. the P5 `shipped` flip) **plus four always-rendered title-carded chapters** —
+the **mem0 memory view**, the **Kanban** create→claim→complete lifecycle, the **Greptile** PR-review
+instruction, and the **Linear ticket ending**. Lower-signal components (per the component-inventory
+map: Nous Portal inference, `fuse_signals`, Codegen routing, the gate battery, the MicroVM spike)
+become title cards rather than bespoke live captures — the graceful-degradation montage philosophy
+(design Q6) carried forward. `assert_showcase_video.py` raises the manifest minima accordingly
+(`SHOWCASE_MIN_SEGMENTS=5` + a required-id check on the four D-2 title segments; both env-overridable
+so a deliberately smaller montage is still possible). **Final segment ORDERING is a collaborative
+human micro-detail (D-2 open question), not gated.**
+
+**The read-only memory view (P1 made visible).** `scripts/render_memory_card.py` is a NEW read-only
+surface that queries the unified `memories` rows + mem0-native entity links and renders them to a
+self-contained `file://` HTML — reusing the `render_ticket_card.py:51-107` marked.js template /
+screenshot pattern (a module-level f-string + an inlined `json.dumps` payload + one CDN `<script>`,
+no build step). It **never writes** to mem0 and degrades gracefully (emits a valid "collection
+unreachable" card) if pgvector is down — the load-bearing accumulation proof remains
+`assert_memory_accumulates.py`; this card is the *visualization*. A `--baseline`/`--against` diff
+mode highlights rows that are NEW since a snapshot, which is exactly what the new
+`scripts/assert_memory_view_grows.py` gate uses to SCRIPT the "visibly more rows after a loop" claim
+(render before → run one decision through the real write path → render after → assert the parsed
+count strictly grew). The gate runs against a throwaway isolated collection, so it never pollutes the
+live `memories`.
+
+**Decision: the default ending stays the reproducible `file://` snapshot; the authenticated
+live-Linear ending is OPTIONAL and gated, never the default.** The throwaway container Chromium has
+no Linear session, so the live ticket URL hits Linear's auth wall. Rather than make the demo depend
+on a host-held login, the **default** ending remains the git-tracked `tickets/<ID>.md` snapshot
+rendered to `file://` (no auth, always passes `verify_recording.py`). The authenticated ending is
+opt-in: `recorder/entrypoint.sh`'s `launch_browser` appends `--user-data-dir=$CHROMIUM_USER_DATA_DIR`
+**only when that env var is set**, `docker-compose.yml` bind-mounts a **gitignored**
+`./recorder-profile` (it holds a live session — never committed, AGENTS.md rule 3/8), and
+`record_run.sh`'s `TICKET_LIVE_URL=1` block resolves the filed ticket URL and launches the right
+pane with that persistent profile so a logged-in session carries into the capture.
+
+**Decision: gate the WIRING, leave the live-session eyeball to a human.** Proving a recording ends
+on the *genuine* authenticated Linear page needs a human-held Linear session — that stays a human
+checkpoint. But the wiring ("does the recorder launch Chromium WITH `--user-data-dir` when a profile
+is provided?") is fully automatable: `scripts/assert_persistent_profile_wiring.py` drives the real
+`launch_browser` path inside the running recorder with a **throwaway** `--user-data-dir` and a
+harmless local target, then asserts the launched command carried the flag (and that Chromium
+populated the dir) — exercising the wiring with no real Linear session. This keeps the falsifiable
+exit-0 contract on the load-bearing mechanism while honestly scoping the two genuinely-human checks
+(the authenticated-session eyeball and the collaborative segment ordering).
+
+> _Grounded in: *The Lean Startup* — demo the working system honestly (a reproducible default that
+> never fakes auth) over a staged screenshot; *Accelerate* — reproducible-from-clean-clone artifacts
+> and deterministic exit-0 gates over manual, un-reproducible captures; *Building Microservices* —
+> visualize the real component topology (the coupling graph, the memory layer, the Kanban lifecycle)
+> so the architecture is legible, not asserted._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

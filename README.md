@@ -85,8 +85,22 @@ and is verifiable before the next begins.
   P2). Gated by `assert_shipped_flip.py` (flips a known bet on an isolated temp copy, cross-reads the
   metric against real Stripe data, and proves unrelated rows stay false — the real ledger untouched).
 
-The rest of **GLO-14** rolls forward: a real-Linear-UI demo ending + read-only memory view,
-host-orchestrator MicroVM confinement, and a Moderne paid-tier evaluation.
+- **Demo (D-2)** — **Fuller multi-component montage + read-only memory view + optional authenticated
+  Linear ending.** `build_showcase_video.py`'s catalogue now carries the D-2 segment story (the
+  visual hero loop + Stripe/egress/PMF data surfaces + four always-rendered title-carded chapters:
+  the **mem0 memory view**, the **Kanban** create→claim→complete lifecycle, the **Greptile** PR-review
+  instruction, and the **Linear ticket ending**); `assert_showcase_video.py` raises the manifest
+  minima to require those D-2 segments. A new read-only **`render_memory_card.py`** renders the
+  `memories` rows + mem0-native entity links to a self-contained `file://` HTML (the marked.js card
+  pattern), and **`assert_memory_view_grows.py`** scripts the "visibly more rows after a loop" claim.
+  The recorded demo's **default ending stays the reproducible `file://` ticket snapshot** (no auth);
+  an **optional** authenticated ending (`TICKET_LIVE_URL=1` + a mounted, gitignored persistent
+  Chromium profile — `recorder-profile/`) ends on the **real** logged-in Linear ticket UI. The
+  persistent-profile **wiring** is gated by `assert_persistent_profile_wiring.py` (asserts the recorder
+  launches Chromium WITH `--user-data-dir`), independent of any real Linear session.
+
+The rest of **GLO-14** rolls forward: host-orchestrator MicroVM confinement, and a Moderne
+paid-tier evaluation.
 
 ## Quick start
 
@@ -120,6 +134,12 @@ Complete every item before running later phases.
       can satisfy this). (Phase 4.)
 - [ ] *(Optional, future)* **mem0 Platform key** — `MEM0_API_KEY` in `.env` enables the cloud
       fallback for self-hosted pgvector memory.
+- [ ] *(Optional, GLO-14 P3)* **Authenticated Linear demo ending** — the recorded demo ends on the
+      reproducible `file://` ticket snapshot by **default** (no setup). To instead end on the **real**
+      logged-in Linear ticket UI, populate the gitignored persistent Chromium profile once
+      (`chromium --user-data-dir=$PWD/recorder-profile` → log in to Linear), then record with
+      `TICKET_LIVE_URL=1`. :warning: **Needs your click** — and the profile holds a live session, so it
+      is **never committed** (`recorder-profile/` is gitignored).
 
 ## Repository layout
 
@@ -135,7 +155,9 @@ Complete every item before running later phases.
 │   ├── assert_*.py           # per-slice exit-0-on-pass gates (egress / stripe / sonar / pmf / showcase / …)
 │   ├── stripe_client.py / stripe_seed.py        # real Stripe test-mode metrics
 │   ├── sonarqube_client.py / fuse_signals.py    # SonarQube DETECT + graphify fusion
-│   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket cards
+│   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket/memory cards
+│   ├── render_memory_card.py                     # read-only mem0 `memories` view (file:// HTML, marked.js)
+│   ├── assert_memory_view_grows.py / assert_persistent_profile_wiring.py  # GLO-14 P3 demo gates
 │   └── file_fullbuild_ticket.py / snapshot_tickets.py  # author + snapshot the full-build epic
 ├── docs/
 │   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)

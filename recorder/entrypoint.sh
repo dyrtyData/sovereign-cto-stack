@@ -64,6 +64,15 @@ has_mapped_window() {
 # --- paint a browser surface (URL or local HTML file) ------------------------
 # $2 (optional) "right" tiles the browser to the right HALF of the screen (for the
 # split-screen); default is full-screen kiosk.
+#
+# GLO-14 P3: when CHROMIUM_USER_DATA_DIR is set (a bind-mounted, PERSISTENT and
+# AUTHENTICATED Chromium profile — see docker-compose.yml + scripts/record_run.sh's
+# TICKET_LIVE_URL=1 path), Chromium launches WITH `--user-data-dir=<that dir>` so a
+# real logged-in Linear session is carried into the capture (the live authenticated
+# Linear ending). With NO such dir set (the reproducible DEFAULT), Chromium launches
+# throwaway/sessionless exactly as before — so the default `file://` snapshot ending
+# is unchanged and never depends on any host-held session. The profile dir is
+# gitignored (no session secrets committed — AGENTS.md rule 3/8).
 launch_browser() {
   local target="$1"
   local where="${2:-full}"
@@ -76,6 +85,14 @@ launch_browser() {
     w=$(( SCREEN_W / 2 )); x=$(( SCREEN_W - w ))
     # not kiosk when tiled (kiosk forces fullscreen and ignores geometry)
     args=(--window-position="${x},0")
+  fi
+
+  # Persistent authenticated profile (GLO-14 P3, OPTIONAL): only when a profile dir
+  # is mounted. Default runs leave this empty -> sessionless throwaway browser.
+  if [ -n "${CHROMIUM_USER_DATA_DIR:-}" ]; then
+    mkdir -p "$CHROMIUM_USER_DATA_DIR" 2>/dev/null || true
+    args+=(--user-data-dir="$CHROMIUM_USER_DATA_DIR")
+    log "using PERSISTENT Chromium profile --user-data-dir=$CHROMIUM_USER_DATA_DIR (authenticated-session path)"
   fi
 
   log "painting browser surface: $target (where=$where, ${w}x${SCREEN_H}+${x})"
@@ -245,6 +262,10 @@ case "$cmd" in
   #   navigate <url>
   navigate)        start_xvfb; navigate_url "$1" ;;
   surface-html)    start_xvfb; launch_browser "file://$1" ;;
+  # GLO-14 P3 / D-2: paint the read-only mem0 memory card (a local file:// HTML the
+  # host renders via scripts/render_memory_card.py). Same throwaway/no-auth path as
+  # surface-html — kept as a NAMED verb so the montage step reads self-documenting.
+  surface-memory)  start_xvfb; launch_browser "file://$1" "${2:-full}" ;;
   surface-banner)  start_xvfb; launch_banner "${1:-Sovereign CTO — recording}" ;;
   # split-screen hero: live agent-log terminal (left) + graph html (right)
   #   surface-split <logfile> <html-file> [title]
@@ -259,5 +280,5 @@ case "$cmd" in
     start_xvfb
     if has_mapped_window; then echo yes; exit 0; else echo no; exit 1; fi
     ;;
-  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
+  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-memory FILE [where]|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
 esac

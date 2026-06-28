@@ -37,7 +37,23 @@ RECORDINGS = REPO_ROOT / "recordings"
 MANIFEST_NAME = "showcase_manifest.json"
 
 MIN_HERO = int(os.environ.get("SHOWCASE_MIN_HERO", "1"))
-MIN_SEGMENTS = int(os.environ.get("SHOWCASE_MIN_SEGMENTS", "1"))
+# GLO-14 P3 / D-2: the montage now carries the fuller D-2 segment story, including
+# four ALWAYS-rendered title-carded chapters (they need no backing artifact). So the
+# guaranteed minimum rises from 1 to: 1 hero + the 4 D-2 title segments = 5. The
+# data-surface proofs (egress/Stripe/SonarQube/PMF) are still included only when
+# their artifact is present, so they are NOT in the hard minimum. Override via env.
+MIN_SEGMENTS = int(os.environ.get("SHOWCASE_MIN_SEGMENTS", "5"))
+
+# The D-2 title-carded segments build_showcase_video.py renders unconditionally
+# (memory view, Kanban transitions, Greptile review, the Linear ending). Each is a
+# fuller-story chapter the gate now requires the manifest to carry. Override via env
+# (comma-separated) for a deliberately smaller montage.
+REQUIRED_IDS = [
+    s.strip() for s in os.environ.get(
+        "SHOWCASE_REQUIRED_IDS",
+        "memory-view,kanban-transitions,greptile-review,linear-ending",
+    ).split(",") if s.strip()
+]
 
 
 def _newest_showcase() -> Path | None:
@@ -99,6 +115,15 @@ def main(argv: list[str]) -> int:
         print(f"PASS - at least {MIN_SEGMENTS} segment(s) in the montage ({total})")
     else:
         print(f"FAIL - fewer than {MIN_SEGMENTS} segment(s) ({total})")
+        ok = False
+
+    # (C) the D-2 fuller-story segments are present (GLO-14 P3)
+    present_ids = {s.get("id") for s in segments}
+    missing = [i for i in REQUIRED_IDS if i not in present_ids]
+    if not missing:
+        print(f"PASS - all required D-2 segments present ({', '.join(REQUIRED_IDS)})")
+    else:
+        print(f"FAIL - missing required D-2 segment(s): {', '.join(missing)}")
         ok = False
 
     print("RESULT:", "PASS" if ok else "FAIL")

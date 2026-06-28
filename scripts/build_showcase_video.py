@@ -114,13 +114,51 @@ def _pmf_bullets() -> list[str]:
         opps = led.get("opportunities", [])
         scores = " / ".join(str(o.get("rice_score")) for o in opps[:3])
         prior = led.get("prior_decisions_consulted", {}).get("already_decided_ids", [])
+        shipped = sum(1 for o in opps if o.get("shipped"))
         return [
             f"{len(opps)} opportunities ranked RICE ({scores})",
             "grounded in corpus + real Stripe MRR/churn",
             f"prior decisions consulted — did NOT re-propose {', '.join(prior) or 'past bets'}",
+            f"North Star: {shipped}/{len(opps)} shipped:true (P5 flip from real Stripe outcome)",
         ]
     except Exception:  # noqa: BLE001
         return []
+
+
+def _memory_bullets() -> list[str]:
+    """Proof bullets for the read-only mem0 memory view (GLO-14 P1 → D-2).
+
+    Read from the most recent `recordings/memory_*.html` card's emitted baseline
+    JSON if present, else state the capability. The load-bearing accumulation proof
+    is assert_memory_accumulates.py; this segment is the visual."""
+    try:
+        baselines = sorted(RECORDINGS.glob("memory_*_baseline.json"),
+                           key=lambda p: p.stat().st_mtime)
+        rows = None
+        if baselines:
+            rows = json.loads(baselines[-1].read_text()).get("count")
+        return [
+            "mem0 'memories' collection ACCUMULATES run-over-run (P1 closed the write path)",
+            (f"read-only view shows {rows} memories"
+             if rows is not None else
+             "read-only HTML view renders the rows + mem0-native entity links"),
+            "git stays authoritative; mem0 is the recall complement (search-before, add-after, infer=True)",
+        ]
+    except Exception:  # noqa: BLE001
+        return [
+            "mem0 'memories' collection ACCUMULATES run-over-run (P1 closed the write path)",
+            "read-only HTML view renders the rows + mem0-native entity links",
+            "git stays authoritative; mem0 is the recall complement",
+        ]
+
+
+def _kanban_bullets() -> list[str]:
+    """Proof bullets for the PMF Kanban create→claim→complete lifecycle."""
+    return [
+        "PMF Kanban (~/.hermes/kanban.db): create → claim → complete",
+        "the CTO-Market loop drives a real card through every state transition",
+        "the lifecycle is what flips a bet's North Star 'shipped' signal (with P5)",
+    ]
 
 
 def catalogue() -> list[dict]:
@@ -196,6 +234,54 @@ def catalogue() -> list[dict]:
                 headline="RICE-ranked opportunities",
                 bullets=_pmf_bullets(),
                 footer="gate: <b>assert_pmf_ranked.py</b> (≥2 scored, ranked, + prior decisions)",
+            ),
+        },
+        # ---- GLO-14 D-2 segments (title-carded; always render) --------------
+        # These surface lower-signal-but-load-bearing components as title cards so
+        # the montage tells the fuller P3 story. `kind="title"` segments need NO
+        # backing artifact — they always render from their bullets.
+        {
+            "id": "memory-view", "kind": "title",
+            "card_fn": lambda: dict(
+                kicker="GLO-14 P1 — a system that LEARNS",
+                headline="mem0 memory view — it grows",
+                bullets=_memory_bullets(),
+                footer="gates: <b>assert_memory_accumulates.py</b> · <b>assert_memory_view_grows.py</b>",
+            ),
+        },
+        {
+            "id": "kanban-transitions", "kind": "title",
+            "card_fn": lambda: dict(
+                kicker="GLO-14 P3 — full PMF loop",
+                headline="Kanban: create → claim → complete",
+                bullets=_kanban_bullets(),
+                footer="state: <b>~/.hermes/kanban.db</b> (real lifecycle, not a mock)",
+            ),
+        },
+        {
+            "id": "greptile-review", "kind": "title",
+            "card": dict(
+                kicker="GLO-14 P2 — ship AND review",
+                headline="Greptile PR review (out-of-repo)",
+                bullets=[
+                    "every filed ticket carries: 'run Greptile on the PR (/greptile)'",
+                    "HumanLayer-on-Claude-Code runs greptile review + addresses findings",
+                    "the Greptile CLI/skill live globally in ~/.claude — zero in-repo coupling",
+                ],
+                footer="gate: <b>assert_greptile_instruction.py</b> (the ticket carries the line)",
+            ),
+        },
+        {
+            "id": "linear-ending", "kind": "title",
+            "card": dict(
+                kicker="GLO-14 P3 — the ending",
+                headline="Filed Linear ticket (authenticated)",
+                bullets=[
+                    "DEFAULT: the git-tracked tickets/<ID>.md snapshot, rendered file:// (no auth)",
+                    "OPTIONAL: TICKET_LIVE_URL=1 + a persistent profile ends on the REAL Linear UI",
+                    "both paths show the just-filed [Brownfield]/[Product] ticket in the browser",
+                ],
+                footer="gate: <b>assert_demo_authenticity.py</b> (the snapshot ending is reproducible)",
             ),
         },
     ]
@@ -303,6 +389,20 @@ def main() -> int:
             if not normalize_clip(rec, seg_clip):
                 print(f"  skip  {sid:16s} — normalize failed")
                 continue
+        elif seg.get("kind") == "title":
+            # GLO-14 D-2 title-carded segment: NO backing artifact required — it
+            # always renders from its bullets (the fuller-story chapters: memory
+            # view, Kanban transitions, Greptile review, the Linear ending).
+            card = seg["card_fn"]() if "card_fn" in seg else dict(seg["card"])
+            if not card.get("bullets"):
+                print(f"  skip  {sid:16s} — title segment produced no bullets")
+                continue
+            print(f"  keep  {sid:16s} — title-carded segment")
+            seg_clip = WORK / f"_body_{len(clips):02d}_{sid}.mp4"
+            if not data_clip(card, seg_clip, DATA_SECONDS):
+                print(f"  skip  {sid:16s} — title clip render failed")
+                continue
+            seg["_no_title"] = True
         else:
             art = seg.get("artifact")
             if art is None or not Path(art).exists():
