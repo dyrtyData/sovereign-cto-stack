@@ -761,6 +761,46 @@ the unified `memories` collection via `mem0_record_decision.py` (depends on P2's
 `assert_memory_accumulates.py`'s throwaway collection) so the tracked `recordings/pmf_ledger.json`
 stays all-false and the working tree stays clean.
 
+## GLO-14 P4 — Host-orchestrator MicroVM confinement spike (scoped, not built — design Q9 Option A)
+
+The GLO-13 egress slice (Backlog P1 above) confines the *containerized* sub-tools; the **host Hermes
+orchestrator itself** still runs outside any sandbox. Confining it means moving the host process into
+a **MicroVM** (OpenShell's opt-in `vm` compute driver: libkrun + Apple Hypervisor.framework) — the
+biggest moving-parts/DNS risk in the stack. Design Q9 resolved to **spike + document**, not commit a
+fragile default build. This is a SPIKE: the deliverable is the scripted attempt + the captured
+evidence + the dated go/no-go, **not** a booted VM.
+
+```bash
+# run the spike — stands up the vm driver, captures evidence, ALWAYS exits 0 (no sudo):
+bash scripts/microvm_spike.sh                            # -> recordings/microvm_spike_<ts>.log
+# the tolerant gate — asserts the log + the dated go/no-go exist; per-bug probes self-SKIP
+# unless a future spike boots an in-guest workload (then they assert documented behaviour):
+uv run scripts/assert_microvm_spike.py                   # PASS even when the VM never booted
+```
+
+`scripts/microvm_spike.sh` records host facts, locates the opt-in `openshell-driver-vm` binary and
+checks its `com.apple.security.hypervisor` entitlement, then **attempts to launch it** far enough to
+prove the VM layer comes up (it binds a private gRPC socket), and writes everything — including
+`openshell status` and the four documented macOS limitations — to `recordings/microvm_spike_<ts>.log`.
+It **degrades gracefully**: if OpenShell / the `vm` driver isn't installed or can't boot, it logs the
+limitation and still writes a usable log and exits 0; it never disturbs the running egress gateway
+(it spins up a *standalone* driver to a private socket, then tears it down — it does **not**
+reconfigure the gateway to `OPENSHELL_DRIVERS=vm`, which would break the Docker-driver-backed egress
+gate). Inference stays **cloud** (Nous Portal) throughout — there is no CUDA on Apple Silicon.
+
+`scripts/assert_microvm_spike.py` is the **tolerant** gate (criterion #4 = "scoped or built"): it
+asserts (1) a spike log exists with the `VM_DRIVER_PRESENT`/`VM_DRIVER_BOOTED` markers, and (2)
+`docs/system-design-tradeoffs.md` carries a **dated go/no-go** section naming all four macOS
+limitations (Landlock `best_effort` no-op on XNU, mDNS `.local` non-traversal, no CUDA,
+case-sensitive-APFS virtio-fs). **When** a future spike runs an in-guest workload it also runs three
+deterministic per-bug probes (`.local` mDNS CONNECT must fail, Landlock reports `best_effort`/no-op,
+virtio-fs case-sensitivity resolves as recorded) and asserts each matches the doc — but each probe
+**self-skips** (logged `SKIP`, still exit 0) if the VM didn't get that far, so the gate degrades
+gracefully too. On this Apple-Silicon host the spike found the `vm` driver **boots** (it binds
+Hypervisor.framework); the recorded **go/no-go is NO-GO** for a default build this epic — the fragile
+remainder (gateway reconfigure + guest bootstrap + virtio-fs sharing) is deferred. See the
+"GLO-14 P4" section of `docs/system-design-tradeoffs.md` for the full record.
+
 ## Closeout — the comprehensive showcase montage (hybrid montage, design Q6)
 
 The submitted demo is a **hybrid montage**: live split-screen captures for the inherently-visual

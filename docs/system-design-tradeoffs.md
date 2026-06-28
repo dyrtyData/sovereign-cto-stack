@@ -760,6 +760,67 @@ exit-0 contract on the load-bearing mechanism while honestly scoping the two gen
 > visualize the real component topology (the coupling graph, the memory layer, the Kanban lifecycle)
 > so the architecture is legible, not asserted._
 
+### GLO-14 P4 — Host-orchestrator MicroVM confinement spike (spiked + documented; design Q9 Option A)
+
+**The gap this addresses.** The GLO-13 P1 egress slice confines the *containerized* sub-tools
+(`egress/policy.yaml` enforced by a real OpenShell sandbox). The **host Hermes orchestrator itself**
+— the "brain" — still runs **outside any sandbox** on the macOS host. Confining its egress means
+moving the host process into a **MicroVM** (OpenShell's opt-in `vm` compute driver: libkrun + Apple
+Hypervisor.framework). That is the single biggest moving-parts / DNS risk in the stack.
+
+**Decision: spike + document, do NOT commit a fragile default build (Q9 Option A).** Acceptance
+criterion #4 is "scoped **or** built". Rather than wire a brittle `OPENSHELL_DRIVERS=vm` build onto
+the EOD critical path, this slice ships a scripted, graceful-degradation **spike**
+(`scripts/microvm_spike.sh`) that stands up the `vm` driver far enough to clear the known macOS bugs,
+captures the evidence to `recordings/microvm_spike_<ts>.log`, and records this dated go/no-go. The
+falsifiable contract is `scripts/assert_microvm_spike.py` (tolerant): it asserts the spike log + this
+dated go/no-go exist, and — *when a future spike runs an in-guest workload* — asserts the three
+per-bug probes (`.local` mDNS CONNECT fails, Landlock reports `best_effort`/no-op, virtio-fs
+case-sensitivity) match this record; each probe self-skips (logged `SKIP`, still exit 0) if the VM
+did not get that far, so the gate degrades gracefully on a host that can't boot a full guest.
+
+**What the spike actually found on this Apple-Silicon host (2026-06-28).** The opt-in `vm` compute
+driver binary (`openshell-driver-vm`, ~39 MB) **is installed** in OpenShell 0.0.71's libexec, **is
+codesigned with the `com.apple.security.hypervisor` entitlement**, and — when launched to a private
+gRPC socket — **boots: it acquires Hypervisor.framework and binds its socket** (`VM_DRIVER_BOOTED=yes`
+in the log), creating its `images/`+`sandboxes/` state. So the libkrun VM *driver layer* is viable
+here. The spike **deliberately stops short** of the fragile remainder (Q9 boundary): it does **not**
+destructively reconfigure the running gateway to `OPENSHELL_DRIVERS=vm` (the egress gate depends on
+the Docker driver staying up; no sudo, non-destructive), does **not** mint a guest bootstrap image +
+guest-TLS, and does **not** run the host orchestrator inside the guest end-to-end. Those are exactly
+the steps that carry the four macOS limitations below.
+
+**The four documented macOS limitations** (the reason this is a spike, not a default build):
+
+1. **Landlock `best_effort` is a no-op on XNU.** Landlock is a *Linux* LSM; on the macOS host kernel
+   it silently degrades (OpenShell #803). Filesystem confinement is therefore **not** the
+   load-bearing layer — the network OPA-CONNECT layer is (which is why the GLO-13 egress gate's
+   load-bearing assertion is a *network* 403, independent of Landlock).
+2. **mDNS `.local` non-traversal.** A guest cannot resolve host `.local` mDNS names (e.g.
+   `inference.local`), so a guest→host local-Ollama DNS path is broken. We sidestep it entirely:
+   inference stays **cloud** (Nous Portal).
+3. **No CUDA on Apple Silicon.** No local GPU passthrough for inference; the `--gpu` vm-driver path
+   is moot here. Inference is cloud by design — not a regression.
+4. **Case-sensitive vs case-insensitive APFS over virtio-fs.** The macOS host FS is
+   case-**insensitive** by default while a Linux guest expects case-**sensitive**; shared virtio-fs
+   mounts can collide or resolve surprisingly, a real hazard for any host-dir share into the guest.
+
+**Go/no-go (dated 2026-06-28): NO-GO for a default MicroVM host-confinement build this epic; GO to
+keep it as the next hardening step.** The driver layer boots, which clears the *first* risk, but the
+load-bearing remainder (gateway reconfigure + guest bootstrap + virtio-fs host-dir sharing + the
+`.local`/DNS path for any host service) is precisely the fragile surface Q9 flagged, and three of the
+four limitations bite exactly there. The honest, evidence-backed call is to **NOT** make this the
+default now; the spike + this record satisfy acceptance #4 ("scoped"). **Human decision (confirmed
+2026-06-28): NO-GO — scope only; defer the build to a future hardening epic.** The optional P3
+montage segment #20 (the `openshell status` + driver-boot capture) was also declined — the showcase
+montage already tells the story without it; the captured spike log remains the evidence of record.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — sequence the hardening investment; clear the cheapest
+> risk first (does the driver even boot?) and record the stronger confinement as a deliberate next
+> step rather than over-engineering the platform before the deadline; *Accelerate* — make the safety
+> investigation reproducible and evidence-driven (a scripted spike + a captured log + an exit-0 gate)
+> rather than an un-reproducible manual experiment._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

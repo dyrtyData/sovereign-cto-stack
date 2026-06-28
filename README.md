@@ -99,8 +99,20 @@ and is verifiable before the next begins.
   persistent-profile **wiring** is gated by `assert_persistent_profile_wiring.py` (asserts the recorder
   launches Chromium WITH `--user-data-dir`), independent of any real Linear session.
 
-The rest of **GLO-14** rolls forward: host-orchestrator MicroVM confinement, and a Moderne
-paid-tier evaluation.
+- **P4** — **Host-orchestrator MicroVM confinement spike (scoped, not built — design Q9 Option A).**
+  The host Hermes orchestrator runs *outside* any sandbox today (the GLO-13 egress slice only confines
+  containerized sub-tools). `scripts/microvm_spike.sh` stands up OpenShell's opt-in `vm` compute driver
+  (libkrun + Apple Hypervisor.framework) far enough to record a dated **go/no-go**, capturing the
+  evidence to `recordings/microvm_spike_<ts>.log` and the four macOS limitations (Landlock `best_effort`
+  no-op on XNU, mDNS `.local` non-traversal, no CUDA, case-sensitive-APFS virtio-fs) into
+  `docs/system-design-tradeoffs.md`. It degrades gracefully (always exit 0, no sudo, never disturbs the
+  running egress gateway). Gated by `assert_microvm_spike.py` (tolerant: asserts the log + dated go/no-go
+  exist, and runs the per-bug probes only when a future spike boots an in-guest workload — each probe
+  self-skips otherwise). The spike found the `vm` driver **boots** on this host (it binds
+  Hypervisor.framework); the **go/no-go is NO-GO** for a default build this epic — the fragile remainder
+  (gateway reconfigure + guest bootstrap + virtio-fs sharing) is deferred. Acceptance #4 = "scoped".
+
+The rest of **GLO-14** rolls forward: a Moderne paid-tier evaluation and the remaining Part C deferrals.
 
 ## Quick start
 
@@ -158,6 +170,7 @@ Complete every item before running later phases.
 │   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket/memory cards
 │   ├── render_memory_card.py                     # read-only mem0 `memories` view (file:// HTML, marked.js)
 │   ├── assert_memory_view_grows.py / assert_persistent_profile_wiring.py  # GLO-14 P3 demo gates
+│   ├── microvm_spike.sh / assert_microvm_spike.py  # GLO-14 P4 host-MicroVM confinement spike + tolerant gate
 │   └── file_fullbuild_ticket.py / snapshot_tickets.py  # author + snapshot the full-build epic
 ├── docs/
 │   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)
