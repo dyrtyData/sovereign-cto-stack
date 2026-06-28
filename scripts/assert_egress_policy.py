@@ -161,8 +161,13 @@ def main() -> int:
               f"(curl exit {neg_exit}, http {neg_code}) — deny-by-default is NOT enforced")
         result_ok = False
 
-    # --- POSITIVE: allow-listed CONNECT must SUCCEED ---
-    pos_ok = pos_exit == 0 and bool(pos_code) and 200 <= pos_code < 400
+    # --- POSITIVE: allow-listed CONNECT must SUCCEED (the TUNNEL is established) ---
+    # The load-bearing signal is that the CONNECT tunnel was permitted — i.e. curl
+    # exited 0 — NOT the HTTP status the origin then returns. An unauthenticated
+    # GET to api.linear.app legitimately answers 401/404/405, which still proves the
+    # allow-list let the tunnel through; a DENIED tunnel is curl exit 56 (the negative
+    # case). So we must not gate the positive test on a 2xx/3xx status.
+    pos_ok = pos_exit == 0
     if pos_ok:
         print(f"PASS [positive]: CONNECT to {ALLOW_HOST} ESTABLISHED "
               f"(curl exit {pos_exit}, http {pos_code}) — allow-list does not break legitimate egress")

@@ -130,7 +130,10 @@ services:
   # reads $SONAR_TOKEN or that file. There is NO graceful degradation — if
   # SonarQube is unreachable the client/gate FAIL loudly (never fabricate issues).
   sonarqube:
-    image: sonarqube:community
+    # Pinned (not the floating :community tag) so a new Community release can't be
+    # pulled mid-stream and break the existing online-boutique scan project (H2
+    # schema migrations / changed API responses). Matches the scanned version.
+    image: sonarqube:26.6.0.123539-community
     ports:
       - "${SONAR_HOST_PORT:-9000}:9000"
     environment:

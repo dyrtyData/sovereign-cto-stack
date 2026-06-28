@@ -57,12 +57,26 @@ COHORTS = [
 
 
 def _already_seeded() -> bool:
-    """True if any customer already carries the seed metadata tag."""
-    res = S.api("GET", "/customers", {"limit": 100})
-    for c in res.get("data", []):
-        if (c.get("metadata") or {}).get("seed") == SEED_TAG:
-            return True
-    return False
+    """True if any customer already carries the seed metadata tag.
+
+    Paginates the full customer list (Stripe caps `limit` at 100 and signals more
+    pages via `has_more`/`starting_after`). A single first-page scan would miss an
+    existing tagged customer once the account holds >100 customers (repeated --force
+    runs, a shared account), and silently duplicate the cohorts.
+    """
+    starting_after = None
+    while True:
+        params: dict = {"limit": 100}
+        if starting_after:
+            params["starting_after"] = starting_after
+        res = S.api("GET", "/customers", params)
+        data = res.get("data", [])
+        for c in data:
+            if (c.get("metadata") or {}).get("seed") == SEED_TAG:
+                return True
+        if not res.get("has_more") or not data:
+            return False
+        starting_after = data[-1]["id"]
 
 
 def _ensure_price(name: str, amount: int) -> str:
