@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:58:41+00:00
+- **snapshot captured:** 2026-06-28T00:10:26+00:00
 
 ## Description
 
@@ -130,15 +130,17 @@ a short OAuth bootstrap) so the recording can end on the **actual Linear ticket 
 real-Linear-UI ending is more convincing for the submission. Captured here as the deliberate next
 step rather than fragile session plumbing on the deadline.
 
-### P4 — Host-orchestrator egress confinement via MicroVM (OpenShell Option B)
+### P4 — Host-orchestrator egress confinement via OpenShell's MicroVM driver (still NemoClaw, deeper)
 
-**Scope.** Distinct from — NOT replaced by — the NemoClaw/OpenShell egress that <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P1
-already SHIPPED. P1 confines the **containerized sub-tools** (the sandbox demonstrably refuses a
-non-allow-listed CONNECT). This item confines the **host Hermes orchestrator's OWN egress** — the
-orchestrator runs on the macOS host, *outside* any sandbox — by moving it into a MicroVM (libkrun +
-Hypervisor.framework), OpenShell Option B, already recorded in `docs/system-design-tradeoffs.md`.
-i.e. "now sandbox the brain too," not "sandbox the tools again." Inference stays cloud (no CUDA on
-Apple Silicon); watch the Landlock `best_effort` and `inference.local` mDNS macOS bugs.
+**Scope.** This DOES use NemoClaw/OpenShell — it is the SAME stack <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P1 shipped, switched to
+OpenShell's **MicroVM compute driver** (libkrun + Apple Hypervisor.framework, OpenShell Option B)
+instead of the **container** driver. P1 (container driver) confines the **containerized sub-tools**
+(the sandbox demonstrably refuses a non-allow-listed CONNECT). P4 confines the **host Hermes****
+****orchestrator's OWN egress** — the orchestrator runs on the macOS host, *outside* any sandbox today —
+by running it inside an OpenShell-managed MicroVM. i.e. "use NemoClaw to sandbox the brain too,"
+not a different tool and not a re-do of P1. Already recorded in `docs/system-design-tradeoffs.md`.
+Inference stays cloud (no CUDA on Apple Silicon); watch the Landlock `best_effort` and
+`inference.local` mDNS macOS bugs.
 **Rationale.** Strongest confinement, biggest moving-parts/DNS risk — sequenced after the
 load-bearing containerized layer that ships today (An Elegant Puzzle: sequence the hardening).
 

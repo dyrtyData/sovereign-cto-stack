@@ -352,14 +352,16 @@ a short OAuth bootstrap) so the recording can end on the **actual Linear ticket 
 real-Linear-UI ending is more convincing for the submission. Captured here as the deliberate next
 step rather than fragile session plumbing on the deadline.
 
-### P4 — Host-orchestrator egress confinement via MicroVM (OpenShell Option B)
-**Scope.** Distinct from — NOT replaced by — the NemoClaw/OpenShell egress that GLO-13 P1
-already SHIPPED. P1 confines the **containerized sub-tools** (the sandbox demonstrably refuses a
-non-allow-listed CONNECT). This item confines the **host Hermes orchestrator's OWN egress** — the
-orchestrator runs on the macOS host, *outside* any sandbox — by moving it into a MicroVM (libkrun +
-Hypervisor.framework), OpenShell Option B, already recorded in `docs/system-design-tradeoffs.md`.
-i.e. "now sandbox the brain too," not "sandbox the tools again." Inference stays cloud (no CUDA on
-Apple Silicon); watch the Landlock `best_effort` and `inference.local` mDNS macOS bugs.
+### P4 — Host-orchestrator egress confinement via OpenShell's MicroVM driver (still NemoClaw, deeper)
+**Scope.** This DOES use NemoClaw/OpenShell — it is the SAME stack GLO-13 P1 shipped, switched to
+OpenShell's **MicroVM compute driver** (libkrun + Apple Hypervisor.framework, OpenShell Option B)
+instead of the **container** driver. P1 (container driver) confines the **containerized sub-tools**
+(the sandbox demonstrably refuses a non-allow-listed CONNECT). P4 confines the **host Hermes
+orchestrator's OWN egress** — the orchestrator runs on the macOS host, *outside* any sandbox today —
+by running it inside an OpenShell-managed MicroVM. i.e. "use NemoClaw to sandbox the brain too,"
+not a different tool and not a re-do of P1. Already recorded in `docs/system-design-tradeoffs.md`.
+Inference stays cloud (no CUDA on Apple Silicon); watch the Landlock `best_effort` and
+`inference.local` mDNS macOS bugs.
 **Rationale.** Strongest confinement, biggest moving-parts/DNS risk — sequenced after the
 load-bearing containerized layer that ships today (An Elegant Puzzle: sequence the hardening).
 
