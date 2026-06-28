@@ -312,6 +312,162 @@ delta) — so a black or still recording fails CI.
 
 > _Grounded in: *Accelerate* — make the working system observable and the demo reproducible._
 
+### Backlog P1 — Deny-by-default egress hardening (built; the sovereign safety layer)
+
+The Q3 deferral above is now **partially actioned** as the GLO-13 P1 slice. What landed and
+the honest tradeoffs:
+
+**What's built.** A reviewable allow-list artifact (`egress/policy.yaml`) enforced
+out-of-process by a **real NVIDIA OpenShell sandbox** (verified against OpenShell 0.0.71) — not
+a hand-rolled proxy. A workload is confined with
+`openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ -- <cmd>`; the
+sandbox supervisor (PID 1) auto-injects `HTTPS_PROXY` and routes every outbound TLS CONNECT
+through the OpenShell gateway's OPA proxy (`https://127.0.0.1:17670`, a local launchd service).
+A CONNECT whose `host:port` matches an `enforcement: enforce` endpoint in the policy (Linear /
+Telegram / Nous-inference / web-scrape) is tunnelled; every other CONNECT is **refused by
+default** (`curl: (56) CONNECT tunnel failed, response 403`). No `egress-proxy` compose service
+exists — enforcement is the sandbox, and the policy is loaded read-only by OpenShell. The gate
+`scripts/assert_egress_policy.py` drives a real sandbox and proves it.
+
+**Decision: the gate's load-bearing assertion is the NEGATIVE test (Q3-sub, Option β).**
+Deny-by-default is only meaningful if you can demonstrate a denial; a positive-only gate is
+satisfiable by a sandbox that blocks nothing. So the gate runs both probes inside the confined
+sandbox and asserts a CONNECT to a non-allow-listed host (`example.com:443`) is **refused**
+(load-bearing — curl exit 56 / 403) *and* `api.linear.app:443` **succeeds** (positive path —
+http 200), proving the allow-list doesn't break legitimate egress.
+
+> _Grounded in: *Accelerate* — make safety properties observable and verifiable, not asserted;
+> reproducible feedback over trust._
+
+**Honest degradation — the two documented macOS bugs.** The network CONNECT layer (what we
+enforce + assert) is deliberately **independent of the Landlock filesystem layer**, because
+on macOS the OpenShell sandbox's Landlock support runs in `best_effort` mode and can
+**silently degrade** (OpenShell #803) — a filesystem-confinement assertion there would be
+fragile. By making the load-bearing assertion a *network* CONNECT refusal, the safety proof
+stays reliable regardless of the Landlock state. Separately, the sandbox has a known
+`inference.local` **mDNS resolution constraint** on macOS (the broken local-Ollama DNS path):
+inference therefore stays **cloud** (Nous Portal, already required since there's no CUDA on
+Apple Silicon), which sidesteps the mDNS path entirely.
+
+**Recorded for GLO-14, not built now: host-orchestrator-in-MicroVM confinement (Q3 Option B).**
+This slice enforces egress on the **containerized** sub-tools inside the LinuxKit VM. Confining
+the **host** Hermes orchestrator's own egress requires moving it into a MicroVM (libkrun +
+Hypervisor.framework), which adds the biggest moving-parts/DNS risk; that is captured as a
+**GLO-14** path, not built in this pass.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — sequence the hardening investment; enforce the
+> layer that is load-bearing and reliable now, and record the stronger confinement as a
+> deliberate next step rather than over-engineering the platform before the deadline._
+
+### Backlog P2 — Stripe-grounded AARRR Revenue/Retention (built)
+
+The Q4 deferral is now actioned as the GLO-13 P2 slice.
+
+**What's built.** A stdlib-only reference client (`scripts/stripe_client.py`, following the
+`linear_mcp.py` pattern) reads **real Stripe test-mode** MRR / churn / cohort data and writes
+`recordings/stripe_metrics.json`; the `pmf_brief` skill grounds the AARRR **Revenue/Retention**
+cells in it (citing the artifact), replacing the old web-scraped competitor-pricing assumptions.
+The fresh sandbox is seeded idempotently (`scripts/stripe_seed.py`, metadata tag
+`seed:sovereign-cto-stack`) so the numbers are genuinely real: MRR $1,281/mo, 25% lifetime churn,
+3 monthly cohorts (60%/75%/100% retention). `scripts/assert_stripe_grounding.py` gates it.
+
+**Decision: NO graceful degradation — fail loud, TEST-key-only.** Unlike the outline's
+"optional/seeded" framing, the client FAILS LOUDLY (never fabricates) if `STRIPE_API_KEY` is
+absent/invalid or the sandbox is empty, and a guard **REFUSES** any `sk_live_`/`rk_live_` key. The
+key is documented as required for the grounding but `preflight.sh` stays ungated (the stack still
+runs without it; only the Stripe grounding is unavailable) — mirroring the optional `MEM0_API_KEY`
+pattern. Credibility comes from real data or an honest failure, never a fabricated number.
+
+> _Grounded in: *The Lean Product Playbook* — grounding the value hypothesis in real revenue signal
+> rather than assumptions; *Accelerate* — reproducible, evidence-driven feedback._
+
+### Backlog P3 — SonarQube DETECT + graphify KEEP → Hermes JUDGMENT → Codegen/Moderne (built)
+
+The Q4-folded secondary billing audit + the full-build P3 architecture, now actioned.
+
+**What's built.** A profile-gated SonarQube Community service (compose `--profile sonar`) scans the
+real `workspaces/microservices-demo/` clone; `scripts/sonarqube_client.py` (Bearer token from the
+gitignored `.sonar-token`) pulls `/api/issues/search` + `/api/measures/component` into
+`graphify-out/sonar-issues.json` — a **real scan: 240 issues (230 smells / 7 bugs / 3 vulns)**.
+`scripts/fuse_signals.py` merges them onto `graphify-out/service-coupling.json` as an additive
+`static_analysis` block (the schema is unvalidated JSON), keeping graphify's coupling/`hubs`
+intact (frontend=7 / checkout=6). The auditor files GLO-16 citing the real SonarQube issue key
+(`go:S1135` @ `src/checkoutservice/main.go`) **and** the degree-6 billing-path coupling hub **and**
+a remediation back-end. `scripts/assert_sonar_fusion.py` gates all three.
+
+**Decision: keep graphify; SonarQube augments, never replaces it; Hermes is the JUDGMENT layer.**
+SonarQube has **no coupling metric** (its beta Architecture feature is Cloud-only / Java-first /
+repo-scoped), so for a polyglot multi-service target graphify is genuinely additive. The detectors
+(SonarQube) and remediators (Codegen/Moderne) are commodities; the **white space is the
+textbook-grounded judgment/curation layer** that synthesizes both signals, prioritizes the
+**billing path** (revenue surface — the folded-in P2 secondary), and routes to the right back-end.
+
+**Decision: route to Codegen now; defer the Moderne/OpenRewrite (paid, no free tier) evaluation to
+GLO-14.** GLO-16's billing-path refactor is a novel, judgment-heavy multi-file change, so it routes
+to **Codegen** (named-only — 0 free runs burned). **Moderne/OpenRewrite** is the deterministic
+recipe engine for recipe-amenable + Java debt, but it has **no free tier**, so evaluating it is an
+explicit decision item rolled forward to GLO-14 rather than an unconditional build.
+
+> _Grounded in: *Managing Technical Debt* — making the debt's economic interest legible and
+> prioritizing the highest-business-impact (billing) surface; *Software Architecture: The Hard
+> Parts* — CE/CA coupling analysis as the additive structural signal SonarQube lacks._
+
+### Backlog P4 — Full PMF loop: RICE/ICE-ranked + prior-decisions consult (built)
+
+The Q1 full-scope P4, now actioned (depends on P2's real revenue grounding).
+
+**What's built.** The loop emits **multiple opportunities ranked RICE/ICE** (3 here: 67.5/32.4/10.0)
++ a `recordings/pmf_ledger.json` carrying `rice_score`, `shipped`, and the prior-decisions record,
+each opportunity grounded in the corpus + Stripe. `scripts/assert_pmf_ranked.py` gates ≥2 scored,
+ranked, grounded opportunities + a non-empty "Prior decisions consulted" section.
+
+**Decision (user-requested): consult prior decisions before ranking; fail rather than fabricate.**
+`scripts/mem0_pmf_decisions.py` idempotently seeds the tracked `tickets/[Product]` decisions into
+**self-hosted mem0** (pgvector `mem0-postgres`, local HF embedder) and semantically searches them,
+plus reads the `git log` of `tickets/`. The brief carries a "Prior decisions consulted" section and
+**drops** any candidate matching a prior decision — it correctly does **not** re-propose the
+already-decided GLO-12 autonomous-remediation bet (mem0 returns it @ score 0.32). **No graceful
+degradation:** if mem0 can't persist/retrieve, the run FAILS rather than fabricating "no prior
+decisions".
+
+**Honest limitation → GLO-14.** This slice **reads** prior decisions (seeded + git) but does not yet
+**write** each run's new decision back into the mem0 `memories` collection — so mem0 is verified-
+working but the collection does not yet accumulate over time. Closing that **passive long-lived
+memory-capture** write path is the headline GLO-14 item (the user's explicit request).
+
+> _Grounded in: *Hacking Growth* — a North Star (opportunities shipped) over vanity output;
+> *An Elegant Puzzle* — not re-litigating decided bets; mem0 as a recall convenience over the
+> authoritative git history (never a dependency)._
+
+### Closeout — comprehensive showcase montage (hybrid montage, design Q6) (built)
+
+**What's built.** `scripts/build_showcase_video.py` assembles a **hybrid montage**: live
+split-screen captures for the visual hero loops + short purpose-built segments for the non-visual
+proofs (denied egress / Stripe AARRR / SonarQube issues / ranked PMF), each rendered from its repo
+artifact via `scripts/render_title_card.py` (the `render_service_graph.py` self-contained-HTML
+house style). A **simple `ffmpeg concat`** stitches exactly the segments that pass
+`verify_recording.py` into `recordings/showcase_<ts>.mp4` + a `showcase_manifest.json`;
+`scripts/assert_showcase_video.py` gates a valid, non-static concat carrying ≥ the guaranteed
+visual hero loop(s).
+
+**Decision: simple ffmpeg concat, no editing suite (design Q6 sub-decision).** A GUI editor would
+make the final video a hand-made artifact that can't be rebuilt by a gate or a fresh clone,
+breaking the repo's core regenerate-from-clean-clone invariant. The scripted concat reads whatever
+segments passed `verify_recording.py` and stitches exactly those — so a missing Stripe/SonarQube
+segment simply isn't in the list and the script still produces a valid video (the graceful
+fallback, for free). Title cards are just more self-contained HTML painted onto `:99`, and ffmpeg
+is already the recorder's only video dependency — no new tools enter the stack.
+
+**Decision: P0 ticket-in-browser ending = local-snapshot `file://` HTML, not the live Linear URL.**
+The throwaway container Chromium has no Linear session, so the live ticket URL hit Linear's auth
+wall. `scripts/render_ticket_card.py` renders the tracked local `tickets/<ID>.md` snapshot to a
+self-contained `file://` HTML and the hero capture ends on **that** — the filed ticket visible, no
+auth, fully reproducible. The real-Linear-UI ending (a persistent authenticated Chromium profile)
+is the stronger-but-fragile next step, rolled forward to GLO-14.
+
+> _Grounded in: *Accelerate* — reproducibility and determinism over hand-made artifacts; make the
+> working system observable without breaking the clean-clone invariant._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

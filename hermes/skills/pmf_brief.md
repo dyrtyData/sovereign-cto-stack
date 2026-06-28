@@ -46,6 +46,52 @@ assumption to test next.
    nothing relevant for a given angle, say so for that angle — do not invent
    grounding.
 
+3. **Ground AARRR Revenue & Retention in REAL Stripe data (design Q4 Option B).**
+   The Revenue and Retention legs of the AARRR funnel MUST be grounded in actual
+   revenue, never in competitor-pricing assumptions like "$20–$600/user/month".
+   Before writing the Revenue & Retention section, read the Stripe metrics
+   artifact at `recordings/stripe_metrics.json` (produced by
+   `scripts/stripe_client.py` from real Stripe **test-mode** subscriptions):
+
+   ```bash
+   python3 scripts/stripe_client.py        # (re)writes recordings/stripe_metrics.json
+   cat recordings/stripe_metrics.json
+   ```
+
+   The artifact is `{mrr, arr, active_subs, canceled_subs, churn:{rate,…},
+   cohorts:[{cohort,active,canceled,retention,mrr}]}`. Use the **concrete numbers**
+   — MRR, ARR, lifetime churn rate, and per-month cohort retention — as the
+   Revenue/Retention evidence, and emit a literal
+   `Grounded in: stripe_metrics.json (real test-mode MRR/churn/cohorts — …)` line
+   citing it. This is REQUIRED whenever the artifact is present; do NOT fall back
+   to assumption-based revenue numbers when real Stripe metrics exist. (If the
+   artifact is genuinely absent, say so and use assumption-grounding as the
+   explicit fallback — but the artifact should be present after the Stripe client
+   runs.)
+
+4. **Consult prior decisions BEFORE ranking (Phase-5 enhancement — non-negotiable).**
+   The full PMF loop emits MULTIPLE ranked opportunities (see the `pmf_rank` skill),
+   and before it ranks/recommends anything it MUST consult the two real, local records
+   of prior product decisions so it does not re-propose an already-decided/rejected
+   idea and can cite the past rationale:
+
+   ```bash
+   docker compose up -d mem0-postgres          # ensure the self-hosted backend is up
+   uv run scripts/mem0_pmf_decisions.py "<the PMF question>"   # mem0 + git-history consult
+   ```
+
+   This idempotently seeds the prior `[Product]` decisions that already live in git
+   as tracked `tickets/` snapshots into the self-hosted mem0 (pgvector) backend, then
+   semantically searches them AND reads the relevant `git log` commits. It emits JSON
+   `{mem0:{hits:[{decision_id,memory,score}]}, git:{product_tickets:[…],log:[…]}}`.
+   Render the result into a **"Prior decisions consulted"** section of the brief that
+   cites the mem0 hits (by `decision_id` + score) and/or the git commits. If a
+   candidate opportunity was ALREADY decided (a prior `[Product]` ticket covers it),
+   do not re-propose it as novel — drop it, or re-raise it only with an explicit note
+   of the prior decision and what changed. NO fabrication: if mem0 cannot
+   persist/retrieve, FAIL and bring the backend up rather than claiming "no prior
+   decisions".
+
 ## Write the brief to a file
 
 Write the brief as Markdown to a path the recorder/verifier can read back. Prefer:
@@ -66,14 +112,30 @@ The brief MUST contain, in order:
    URLs you scraped. Concrete, not hand-wavy.
 3. **Framework analysis** — apply the corpus frameworks to interpret the signal
    (problem/solution fit, sizing, experimentation, growth).
-4. **Grounding** — for **every distinct `source_file` your multi-angle queries
+4. **AARRR Revenue & Retention (Stripe-grounded)** — the Revenue and Retention
+   legs of the pirate-metrics (AARRR) funnel, grounded in the concrete numbers
+   from `recordings/stripe_metrics.json`: current **MRR / ARR**, the **churn
+   rate**, and **per-month cohort retention**. Reference the real figures (e.g.
+   "MRR $1,281/mo; lifetime churn 25%; latest cohort retention 100%"), NOT
+   competitor-pricing assumptions. Carry a `Grounded in: stripe_metrics.json (…)`
+   line for this section (see Grounding below).
+5. **Grounding** — for **every distinct `source_file` your multi-angle queries
    returned that supports the brief**, a literal line
    `Grounded in: <source_file> (<what THIS text backs>)` tying that source to the
    dimension it grounds. Cite the union — never pre-curate or guess. The string
    `Grounded in:` MUST appear verbatim, once per cited source. At least one cited
    `source_file` must be a real corpus `*.md` (e.g. `the-lean-product-playbook.md`).
-5. **Recommendation** — a clear call.
-6. **Riskiest assumption to test next** — the single experiment to run.
+6. **Prior decisions consulted** — the mem0 hits (by `decision_id` + score) and/or
+   git-history commits returned by `scripts/mem0_pmf_decisions.py`, with a sentence
+   on how they shaped (or ruled out) the candidate opportunities. This section MUST be
+   non-empty and reference mem0 and/or git history.
+7. **Ranked opportunities (RICE/ICE)** — **at least two** opportunities, each with a
+   numeric RICE/ICE score, ranked best-first, each carrying its own `Grounded in:`
+   union (≥1 corpus `*.md` + `stripe_metrics.json`) and a `shipped:` feedback flag.
+   See the `pmf_rank` skill for the scoring and the ledger. The rank-1 opportunity is
+   the one filed as the `[Product]` ticket.
+8. **Recommendation** — a clear call (the rank-1 opportunity).
+9. **Riskiest assumption to test next** — the single experiment to run.
 
 ### Template
 
@@ -91,6 +153,13 @@ The brief MUST contain, in order:
 <2–4 paragraphs interpreting the signal through the corpus frameworks:
 problem/solution fit, market sizing, experimentation, growth loops>
 
+## AARRR Revenue & Retention (Stripe-grounded)
+(real figures from recordings/stripe_metrics.json — NOT competitor-pricing assumptions)
+- **Revenue:** MRR $<mrr>/mo (ARR $<arr>) across <active_subs> active subscriptions.
+- **Retention / churn:** lifetime churn <churn.rate>%, <canceled_subs> canceled of
+  <active+canceled>; per-cohort retention <e.g. 2026-04 60%, 2026-05 75%, 2026-06 100%>.
+- Interpretation: <what the revenue + cohort-retention trend implies for the bet>.
+
 ## Grounded in
 (one line per distinct source_file the multi-angle queries returned — cite the union)
 Grounded in: the-lean-product-playbook.md (Product-Market Fit Pyramid — target
@@ -101,13 +170,32 @@ Grounded in: lean-enterprise.md (validated learning and build-measure-learn unde
 uncertainty).
 Grounded in: trustworthy-online-controlled-experiments.md (designing trustworthy
 A/B tests to validate the riskiest assumption).
+Grounded in: stripe_metrics.json (real Stripe test-mode MRR/ARR, churn rate, and
+per-month cohort retention — the Revenue & Retention legs of the AARRR funnel).
+
+## Prior decisions consulted
+(mem0 self-hosted pgvector + git history — so we don't re-propose a decided idea)
+- mem0 hit: GLO-12 (score 0.32) — "[Product] … add autonomous remediation that opens
+  PRs" is ALREADY a decided opportunity; not re-proposed as novel below.
+- git history: 5a754ef (Phase 4: PMF research profile) filed the first [Product] bet.
+
+## Ranked opportunities (RICE/ICE)
+(≥2 opportunities, scored, ranked best-first; each grounded in corpus + Stripe; shipped-flag = feedback)
+1. **[Product] <opportunity A>** — RICE <score> (R<reach>×I<impact>×C<conf>÷E<effort>).
+   Grounded in: the-lean-product-playbook.md (…). Grounded in: stripe_metrics.json (real MRR/churn). shipped: false
+2. **[Product] <opportunity B>** — RICE <score>. Grounded in: hacking-growth.md (…).
+   Grounded in: stripe_metrics.json (…). shipped: false
 
 ## Recommendation
-<the call>
+<the call — the rank-1 opportunity>
 
 ## Riskiest assumption to test next
 <the single experiment / hypothesis>
 ```
+
+The ranking + the shipped-bet feedback are also persisted to
+`recordings/pmf_ledger.json` (see the `pmf_rank` skill) — the cross-run ledger of
+which bets were ranked and which actually shipped (North Star: opportunities shipped).
 
 ## Then turn the brief into ONE filed product opportunity (THIN loop — do this every run)
 

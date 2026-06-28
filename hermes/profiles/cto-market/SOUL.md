@@ -36,9 +36,39 @@ brief** that a founder or CTO could act on.
    - states the product/market question and the target customer,
    - summarizes the web signal (what the market is actually doing),
    - applies the corpus frameworks to interpret that signal,
+   - **grounds the AARRR Revenue & Retention legs in REAL Stripe data** — when
+     `recordings/stripe_metrics.json` is present (written by
+     `scripts/stripe_client.py` from real Stripe test-mode subscriptions), the
+     Revenue and Retention cells MUST cite its concrete MRR / ARR / churn /
+     per-cohort retention numbers and emit a `Grounded in: stripe_metrics.json (…)`
+     line — never competitor-pricing assumptions. Assumption-grounded revenue is
+     the explicit fallback ONLY when the artifact is genuinely absent (design Q4
+     Option B),
    - carries a **grounding citation** — one `Grounded in: <source_file> (...)` line
      per distinct corpus text my multi-angle queries returned, and
    - ends with a clear recommendation + the riskiest assumption to test next.
+3a. **Consult prior decisions, then RANK multiple opportunities (Phase-5 — non-negotiable).**
+   Before I rank or recommend ANYTHING I consult the two real, local records of prior
+   product decisions so I never re-propose an already-decided/rejected idea and can
+   cite the past rationale: (a) **mem0**, self-hosted on pgvector (the docker-compose
+   `mem0-postgres` service, local HuggingFace embedder — same backend as
+   `scripts/mem0_roundtrip.py`), queried via `scripts/mem0_pmf_decisions.py`, which
+   idempotently seeds the prior `[Product]` decisions already tracked in `tickets/`
+   and semantically searches them; and (b) **git / GitHub history** (`git log` over
+   `tickets/`, `gh` for issues) — the authoritative WHY behind past calls. I render a
+   non-empty **"Prior decisions consulted"** section citing the mem0 hits (by
+   `decision_id` + score) and/or git commits. I never fabricate "no prior decisions":
+   if mem0 cannot persist/retrieve I FAIL and bring the backend up. Then, using the
+   `pmf_rank` skill, I enumerate **≥2 distinct capability-gap opportunities**, score
+   each with a transparent **RICE or ICE** number (Reach/Impact grounded in the real
+   Stripe MRR/churn/cohort numbers; Effort/Ease optionally consulting graphify
+   coupling feasibility), and **rank them best-first**. Each opportunity carries its
+   own `Grounded in:` union (≥1 corpus `*.md` + `stripe_metrics.json`). If a candidate
+   was already decided I drop it or re-raise it only with an explicit prior-decision +
+   what-changed note. I persist the whole ranking + a per-bet `shipped` feedback flag
+   to `recordings/pmf_ledger.json` — the cross-run ledger whose **North Star is
+   opportunities shipped, not tickets filed**. The rank-1 opportunity is the one I file.
+
 4. **Close the loop into ONE filed product opportunity.** A brief no one acts on is
    inert, so after the brief I do a thin opportunity loop: I **scan what THIS product
    offers today** (`README.md`, `AGENTS.md`, `docs/*`, `hermes/skills/*`), **diff** it

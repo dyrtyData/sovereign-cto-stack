@@ -140,6 +140,18 @@ launch_split() {
   sleep 1
 }
 
+# --- navigate the RIGHT-pane browser to a URL (close the file->ticket loop) ---
+# P0 ending: after the run files the [Brownfield]/[Product] ticket, point the
+# right pane at the filed Linear ticket so the recording visibly shows the ticket
+# appearing in the browser. We reuse launch_browser's "right" tiling so the layout
+# matches the split-screen the run was captured with (the left log pane stays put).
+navigate_url() {
+  local url="$1"
+  [ -n "$url" ] || { log "navigate: no URL given"; return 2; }
+  log "navigating right-pane browser to filed ticket: $url"
+  launch_browser "$url" right
+}
+
 # --- paint a plain text banner (fallback surface, never black) ---------------
 launch_banner() {
   local msg="${1:-Sovereign CTO — recording}"
@@ -229,6 +241,9 @@ case "$cmd" in
     exec tail -f /dev/null
     ;;
   surface-url)     start_xvfb; launch_browser "$1" ;;
+  # navigate the right-pane browser to a URL (P0 file->ticket ending)
+  #   navigate <url>
+  navigate)        start_xvfb; navigate_url "$1" ;;
   surface-html)    start_xvfb; launch_browser "file://$1" ;;
   surface-banner)  start_xvfb; launch_banner "${1:-Sovereign CTO — recording}" ;;
   # split-screen hero: live agent-log terminal (left) + graph html (right)
@@ -244,5 +259,5 @@ case "$cmd" in
     start_xvfb
     if has_mapped_window; then echo yes; exit 0; else echo no; exit 1; fi
     ;;
-  *) echo "usage: entrypoint.sh {idle|surface-url URL|surface-html FILE|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
+  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
 esac

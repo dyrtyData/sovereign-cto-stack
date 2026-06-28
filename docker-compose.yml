@@ -89,6 +89,74 @@ services:
     restart: unless-stopped
     profiles: ["record"]
 
+  # --- Phase 2 (P1): deny-by-default egress ---
+  # There is intentionally NO egress service here. Egress enforcement is performed
+  # OUT-OF-PROCESS by a real NVIDIA OpenShell sandbox, not by a compose sidecar:
+  # workloads are confined with
+  #
+  #   openshell sandbox create --no-keep --policy egress/policy.yaml --from egress/ -- <cmd>
+  #
+  # The sandbox supervisor (PID 1) auto-injects HTTPS_PROXY and routes every
+  # outbound TLS CONNECT through the OpenShell gateway's OPA proxy
+  # (https://127.0.0.1:17670, a local launchd service). A CONNECT whose host:port
+  # matches an `enforcement: enforce` endpoint in egress/policy.yaml (the reviewable
+  # safety artifact) is tunnelled; any other CONNECT is REFUSED by default
+  # (`curl: (56) CONNECT tunnel failed, response 403`). This OPA CONNECT network
+  # layer is independent of the Landlock filesystem layer, so the deny-by-default
+  # guarantee holds even where Landlock `best_effort` degrades on macOS
+  # (docs/system-design-tradeoffs.md). The gate scripts/assert_egress_policy.py
+  # drives a real sandbox and asserts the load-bearing NEGATIVE test (non-allow-
+  # listed CONNECT refused) plus a positive-path check (api.linear.app:443 succeeds).
+
+  # --- Phase 4 (P3): SonarQube Community — code-quality DETECT signal ---
+  # The tech-debt loop's quality signal. SonarQube Community Edition runs an
+  # embedded H2 database (single-node, fine for this scan target) and serves the
+  # Web API at http://localhost:9000. Profile-gated ("sonar") so the default
+  # `docker compose up` is unaffected; bring it up explicitly for the audit:
+  #
+  #   docker compose --profile sonar up -d sonarqube
+  #   # wait for http://localhost:9000/api/system/status -> {"status":"UP"}
+  #   # force a token (admin/admin first login), then scan the cloned demo source
+  #   # (workspaces/microservices-demo/, gitignored) with sonar-scanner, and pull
+  #   # issues/measures via scripts/sonarqube_client.py.
+  #
+  # SonarQube is the DETECT source; graphify is KEPT for cross-service coupling
+  # (SonarQube has no coupling metric). scripts/fuse_signals.py merges SonarQube
+  # issues/measures onto graphify-out/service-coupling.json under an additive
+  # top-level `static_analysis` key (research §7 — the JSON is unvalidated).
+  #
+  # No secret is committed: the admin token minted on first login is persisted to
+  # the gitignored .sonar-token (and/or ~/.hermes); scripts/sonarqube_client.py
+  # reads $SONAR_TOKEN or that file. There is NO graceful degradation — if
+  # SonarQube is unreachable the client/gate FAIL loudly (never fabricate issues).
+  sonarqube:
+    # Pinned (not the floating :community tag) so a new Community release can't be
+    # pulled mid-stream and break the existing online-boutique scan project (H2
+    # schema migrations / changed API responses). Matches the scanned version.
+    image: sonarqube:26.6.0.123539-community
+    ports:
+      - "${SONAR_HOST_PORT:-9000}:9000"
+    environment:
+      # Single-node embedded H2 is acceptable for this one-shot scan target; skip
+      # the production Elasticsearch bootstrap checks that assume a tuned host.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    healthcheck:
+      # /api/system/status returns {"status":"UP"} once the web server is ready.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    restart: unless-stopped
+    profiles: ["sonar"]
+
 volumes:
   mem0-data:
   rag-index:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:

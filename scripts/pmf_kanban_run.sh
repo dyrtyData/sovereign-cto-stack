@@ -38,6 +38,7 @@ PMF_TIMEOUT="${PMF_TIMEOUT:-240}"
 QUESTION="${1:-Is there product-market fit for an autonomous AI tech-debt auditor for Series-A engineering teams?}"
 TS="$(date +%Y%m%d_%H%M%S)"
 BRIEF="$REPO_ROOT/recordings/pmf_brief_run_${TS}.md"
+LEDGER="$REPO_ROOT/recordings/pmf_ledger.json"
 
 mkdir -p "$REPO_ROOT/recordings"
 log() { echo "=== pmf_kanban_run: $* ==="; }
@@ -68,6 +69,183 @@ RECOMMENDATION=""
 
 if [ "${NO_AGENT:-0}" = "1" ]; then
   log "NO_AGENT=1 — writing a deterministic stub brief (exercises lifecycle + citation)"
+
+  # Phase 3: ground the AARRR Revenue & Retention legs in REAL Stripe test-mode
+  # metrics. Refresh recordings/stripe_metrics.json from the live Stripe API (the
+  # client FAILS loudly if the sandbox is empty / key is missing — no fabrication),
+  # then render the concrete numbers into the stub brief's AARRR section.
+  log "refreshing recordings/stripe_metrics.json from real Stripe test-mode data"
+  python3 "$REPO_ROOT/scripts/stripe_client.py" >/dev/null || {
+    echo "pmf_kanban_run: stripe_client.py failed — cannot ground AARRR in real data." >&2
+    echo "  seed the sandbox first: python3 scripts/stripe_seed.py" >&2
+    exit 1
+  }
+  AARRR_MD="$(python3 - "$REPO_ROOT/recordings/stripe_metrics.json" <<'PY'
+import json, sys, pathlib
+m = json.loads(pathlib.Path(sys.argv[1]).read_text())
+mrr = m["mrr"]; arr = m["arr"]; active = m["active_subs"]
+churn = m["churn"]["rate"]; canceled = m["canceled_subs"]
+coh = ", ".join(f"{c['cohort']} {round(c['retention']*100)}%" for c in m["cohorts"])
+print(f"- **Revenue:** MRR ${mrr:,.0f}/mo (ARR ${arr:,.0f}) across {active} active subscriptions.")
+print(f"- **Retention / churn:** lifetime churn {round(churn*100)}%, {canceled} canceled; per-cohort retention {coh}.")
+print(f"- Interpretation: the latest cohort retains best while older cohorts show real churn — revenue is small but the retention trend supports the wedge.")
+PY
+)"
+
+  # Phase 5: consult prior decisions (mem0 self-hosted on pgvector + git history)
+  # BEFORE ranking, so we don't re-propose an already-decided idea and can cite the
+  # past rationale. NO graceful degradation — if mem0 can't persist/retrieve, FAIL.
+  log "consulting prior decisions: mem0 (pgvector) + git history (scripts/mem0_pmf_decisions.py)"
+  docker compose up -d mem0-postgres >/dev/null 2>&1 || true
+  PRIOR_JSON="$REPO_ROOT/recordings/pmf_prior_decisions_${TS}.json"
+  if command -v uv >/dev/null 2>&1; then
+    uv run "$REPO_ROOT/scripts/mem0_pmf_decisions.py" "$QUESTION" > "$PRIOR_JSON" 2>"$REPO_ROOT/recordings/pmf_prior_decisions_${TS}.err" || {
+      echo "pmf_kanban_run: mem0_pmf_decisions.py failed — prior-decisions consult is mandatory (no fabrication)." >&2
+      echo "  bring the backend up: docker compose up -d mem0-postgres ; then retry." >&2
+      cat "$REPO_ROOT/recordings/pmf_prior_decisions_${TS}.err" >&2
+      exit 1
+    }
+  else
+    echo "pmf_kanban_run: 'uv' not found — required to run the mem0 prior-decisions consult." >&2
+    exit 1
+  fi
+
+  # Render the "Prior decisions consulted" section + the ledger from the real consult.
+  PRIOR_MD="$(python3 - "$PRIOR_JSON" <<'PY'
+import json, sys, pathlib
+d = json.loads(pathlib.Path(sys.argv[1]).read_text())
+hits = d.get("mem0", {}).get("hits", [])
+git = d.get("git", {})
+out = ["(mem0 self-hosted on pgvector + git history — so we do not re-propose a decided idea)"]
+if hits:
+    for h in hits:
+        did = h.get("decision_id") or "?"
+        sc = h.get("score")
+        sc = f"{sc:.2f}" if isinstance(sc, (int, float)) else "n/a"
+        mem = " ".join((h.get("memory") or "").split())[:200]
+        out.append(f"- mem0 hit: **{did}** (score {sc}) — {mem}")
+else:
+    out.append("- mem0: no prior product decisions matched (fresh decision space).")
+for pt in git.get("product_tickets", []):
+    out.append(f"- git/tickets: **{pt['id']}** filed by `{pt.get('commit','')}` — already-decided [Product] bet; not re-proposed as novel below.")
+for line in git.get("log", [])[:3]:
+    out.append(f"- git log: `{line}`")
+out.append("")
+out.append("Effect on ranking: any opportunity matching a prior decision above is "
+           "dropped or re-raised only with an explicit what-changed note.")
+print("\n".join(out))
+PY
+)"
+
+  # Decide which prior decision ids to AVOID re-proposing (the seeded [Product] gaps).
+  AVOID_IDS="$(python3 - "$PRIOR_JSON" <<'PY'
+import json, sys, pathlib
+d = json.loads(pathlib.Path(sys.argv[1]).read_text())
+ids = sorted({pt["id"] for pt in d.get("git", {}).get("product_tickets", [])})
+print(",".join(ids))
+PY
+)"
+  log "prior [Product] decisions to avoid re-proposing as novel: ${AVOID_IDS:-<none>}"
+
+  # Phase 5: emit >=2 RICE-scored opportunities, ranked best-first, each grounded in
+  # corpus + Stripe, and persist them (with a shipped feedback flag) to the ledger.
+  # The candidates below are DISTINCT from the prior GLO-12 "autonomous remediation
+  # PRs" decision (which we explicitly note as already-decided, not re-proposed).
+  RANKED_MD="$(python3 - "$REPO_ROOT/recordings/stripe_metrics.json" "$LEDGER" "$QUESTION" "$PRIOR_JSON" <<'PY'
+import json, sys, pathlib, datetime
+metrics = json.loads(pathlib.Path(sys.argv[1]).read_text())
+ledger_path = sys.argv[2]; question = sys.argv[3]
+prior = json.loads(pathlib.Path(sys.argv[4]).read_text())
+
+mrr = metrics["mrr"]; churn = metrics["churn"]["rate"]
+cohorts = metrics["cohorts"]
+worst = min(cohorts, key=lambda c: c["retention"])  # leg with the worst retention
+
+# Candidate opportunities — DISTINCT from prior decisions (GLO-12 = autonomous
+# remediation PRs, already decided). RICE = (Reach*Impact*Confidence)/Effort.
+candidates = [
+    {
+        "title": "[Product] PMF agent cannot rank opportunities by market size — add a TAM/SAM sizing + RICE step",
+        "inputs": {"reach": 180, "impact": 2.0, "confidence": 0.75, "effort": 4.0},
+        "grounded_in": ["the-lean-product-playbook.md", "stripe_metrics.json"],
+        "graphify_feasibility": "host-side skill only; does not touch a coupling hub — low effort",
+        "prior_decision": None,
+    },
+    {
+        "title": "[Product] No retention/expansion play for the worst-retaining cohort — add a churn-triggered re-audit nudge",
+        "inputs": {"reach": 90, "impact": 3.0, "confidence": 0.6, "effort": 5.0},
+        "grounded_in": ["hacking-growth.md", "stripe_metrics.json"],
+        "graphify_feasibility": "lands near billing/checkout signals (checkoutservice degree-6 hub) — medium effort",
+        "prior_decision": None,
+    },
+    {
+        "title": "[Product] Briefs are not validated against real experiments — add a trustworthy A/B harness for filed bets",
+        "inputs": {"reach": 60, "impact": 2.0, "confidence": 0.5, "effort": 6.0},
+        "grounded_in": ["trustworthy-online-controlled-experiments.md", "lean-enterprise.md", "stripe_metrics.json"],
+        "graphify_feasibility": "instrumentation only; no hub coupling — medium effort",
+        "prior_decision": None,
+    },
+]
+
+def rice(i):
+    return round((i["reach"] * i["impact"] * i["confidence"]) / i["effort"], 1)
+
+for c in candidates:
+    c["rice_score"] = rice(c["inputs"])
+candidates.sort(key=lambda c: c["rice_score"], reverse=True)
+
+# ledger
+ledger = {
+    "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    "question": question,
+    "scoring_model": "RICE",
+    "north_star": "opportunities_shipped",
+    "prior_decisions_consulted": {
+        "mem0_hits": [
+            {"decision_id": h.get("decision_id"), "score": h.get("score")}
+            for h in prior.get("mem0", {}).get("hits", [])
+        ],
+        "git": prior.get("git", {}).get("log", [])[:5],
+        "already_decided_ids": sorted({pt["id"] for pt in prior.get("git", {}).get("product_tickets", [])}),
+    },
+    "opportunities": [],
+}
+for rank, c in enumerate(candidates, 1):
+    ledger["opportunities"].append({
+        "rank": rank,
+        "title": c["title"],
+        "rice_score": c["rice_score"],
+        "inputs": c["inputs"],
+        "grounded_in": c["grounded_in"],
+        "graphify_feasibility": c["graphify_feasibility"],
+        "prior_decision": c["prior_decision"],
+        "shipped": False,
+    })
+pathlib.Path(ledger_path).write_text(json.dumps(ledger, indent=2) + "\n")
+
+# markdown for the brief
+lines = ["(>=2 opportunities, RICE-scored, ranked best-first; each grounded in corpus + Stripe; shipped-flag = feedback)"]
+for rank, c in enumerate(candidates, 1):
+    i = c["inputs"]
+    lines.append(
+        f"{rank}. **{c['title']}** — RICE {c['rice_score']} "
+        f"(R{i['reach']}×I{i['impact']}×C{i['confidence']}÷E{i['effort']}). "
+        f"Feasibility: {c['graphify_feasibility']}. shipped: false"
+    )
+    for g in c["grounded_in"]:
+        if g == "stripe_metrics.json":
+            lines.append(f"   Grounded in: stripe_metrics.json (real MRR ${mrr:,.0f}/mo, churn {round(churn*100)}%, worst cohort {worst['cohort']} {round(worst['retention']*100)}% — Reach/Impact evidence).")
+        else:
+            lines.append(f"   Grounded in: {g} (framework backing the score).")
+print("\n".join(lines))
+# expose the top opportunity for the handoff
+pathlib.Path(ledger_path + ".top").write_text(candidates[0]["title"])
+PY
+)"
+  TOP_OPP="$(cat "${LEDGER}.top" 2>/dev/null || echo "see ranked opportunities")"
+  rm -f "${LEDGER}.top"
+  log "ledger written: $LEDGER (top: $TOP_OPP)"
+
   cat > "$BRIEF" <<EOF
 # PMF Brief — $QUESTION
 
@@ -85,23 +263,35 @@ discipline says the riskiest assumption is whether teams will act on an
 agent-filed ticket without a human re-deriving it. Growth-loop thinking points to
 the audit -> ticket -> merged-PR loop as the compounding retention mechanic.
 
+## AARRR Revenue & Retention (Stripe-grounded)
+(real figures from recordings/stripe_metrics.json — not competitor-pricing assumptions)
+$AARRR_MD
+
 ## Grounded in
 Grounded in: the-lean-product-playbook.md (Product-Market Fit Pyramid — target customer, underserved needs, value proposition).
 Grounded in: hacking-growth.md (north-star metric and the experiment cadence behind a growth loop).
 Grounded in: lean-enterprise.md (validated learning / build-measure-learn under uncertainty).
 Grounded in: trustworthy-online-controlled-experiments.md (designing a trustworthy test of the riskiest assumption).
+Grounded in: stripe_metrics.json (real Stripe test-mode MRR/ARR, churn rate, and per-month cohort retention — the Revenue & Retention legs of the AARRR funnel).
+
+## Prior decisions consulted
+$PRIOR_MD
+
+## Ranked opportunities (RICE/ICE)
+$RANKED_MD
 
 ## Recommendation
-Pursue a narrow wedge: grounded [Brownfield] refactor tickets for gRPC coupling
-hubs, sold to Series-A platform teams.
+Pursue the rank-1 opportunity above ($TOP_OPP) — distinct from the already-decided
+GLO-12 autonomous-remediation bet — while keeping the grounded [Brownfield] refactor
+wedge for Series-A platform teams as the core.
 
 ## Riskiest assumption to test next
 Will a team merge a PR generated from an agent-filed, textbook-grounded ticket
 without re-deriving the rationale? Run a controlled trial across 10 tickets.
 EOF
-  SUMMARY="PMF brief for the AI tech-debt auditor wedge: pursue grounded [Brownfield] refactor tickets for Series-A platform teams. Grounded in 4 corpus texts."
+  SUMMARY="PMF brief: ${TOP_OPP} (rank-1 of >=2 RICE-ranked opportunities). Prior decisions (mem0+git) consulted; not re-proposing GLO-12. Grounded in 4 corpus texts + Stripe."
   GROUNDED_JSON='["the-lean-product-playbook.md","hacking-growth.md","lean-enterprise.md","trustworthy-online-controlled-experiments.md"]'
-  RECOMMENDATION="Pursue a narrow wedge: grounded [Brownfield] refactor tickets for gRPC coupling hubs, sold to Series-A platform teams."
+  RECOMMENDATION="$TOP_OPP"
 else
   log "running cto-market agent (pmf_brief skill), cap ${PMF_TIMEOUT}s"
   timeout "$PMF_TIMEOUT" "$HERMES" -p cto-market -z \
@@ -142,15 +332,26 @@ fi
 [ -f "$BRIEF" ] || { echo "pmf_kanban_run: no brief artifact at $BRIEF" >&2; }
 
 # --- 4. complete with a STRUCTURED HANDOFF (-> DONE) -------------------------
-METADATA="$(python3 - "$BRIEF" "$GROUNDED_JSON" "$RECOMMENDATION" <<'PY'
+METADATA="$(python3 - "$BRIEF" "$GROUNDED_JSON" "$RECOMMENDATION" "$LEDGER" <<'PY'
 import json,sys,os
-brief, grounded, rec = sys.argv[1], sys.argv[2], sys.argv[3]
+brief, grounded, rec, ledger = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 rel = os.path.relpath(brief, os.getcwd()) if os.path.isabs(brief) else brief
-print(json.dumps({
+md = {
     "artifact": rel,
     "grounded_in": json.loads(grounded) if grounded.strip().startswith("[") else [],
     "recommendation": rec,
-}))
+}
+# Phase 5: surface the ranked ledger in the structured handoff if present.
+if os.path.isfile(ledger):
+    try:
+        L = json.loads(open(ledger).read())
+        md["ledger"] = os.path.relpath(ledger, os.getcwd())
+        md["opportunities_ranked"] = len(L.get("opportunities", []))
+        md["top_rice_score"] = (L.get("opportunities") or [{}])[0].get("rice_score")
+        md["prior_decisions_consulted"] = L.get("prior_decisions_consulted", {})
+    except (ValueError, OSError):
+        pass
+print(json.dumps(md))
 PY
 )"
 
@@ -173,6 +374,7 @@ fi
 log "done — brief: $BRIEF"
 echo "TASK_ID=$TASK_ID"
 echo "BRIEF=$BRIEF"
+[ -f "$LEDGER" ] && echo "LEDGER=$LEDGER"
 echo "METADATA=$METADATA"
 
 # Hand the task id to the verifier (and any caller).

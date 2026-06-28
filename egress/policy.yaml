@@ -1,0 +1,125 @@
+# Sovereign CTO Stack — deny-by-default egress allow-list (Phase 2 / P1).
+#
+# This is a REAL NVIDIA OpenShell sandbox policy (verified against OpenShell 0.0.71).
+# It is the reviewable safety ARTIFACT (design Q3-main, Option C): the single
+# auditable place that declares *every* outbound network destination a confined
+# workload is permitted to reach. Everything not named here is REFUSED by default —
+# the deny-by-default posture that turns the "sovereign" claim into an OPA-enforced
+# property rather than a docs assertion.
+#
+# HOW IT IS ENFORCED. A workload is confined by running it INSIDE an OpenShell
+# sandbox:
+#
+#   openshell sandbox create --no-keep --policy egress/policy.yaml \
+#     --from egress/ -- <command>
+#
+# The sandbox supervisor (PID 1 inside the sandbox) auto-injects HTTPS_PROXY and
+# routes every outbound TLS CONNECT through the OpenShell gateway's OPA proxy
+# (https://127.0.0.1:17670, a local Homebrew launchd service — NOT a compose
+# sidecar). A CONNECT whose host:port matches an `enforcement: enforce` endpoint
+# below is tunnelled (curl → http 200); any other CONNECT is REFUSED
+# (`curl: (56) CONNECT tunnel failed, response 403`). No explicit deny-all rule is
+# needed — unlisted endpoints are denied by default.
+#
+# The gate (scripts/assert_egress_policy.py) drives a real sandbox and asserts BOTH
+# halves (design Q3-sub, Option β): the load-bearing NEGATIVE test — a CONNECT to a
+# host NOT listed here (example.com:443) is refused with 403 / curl exit 56 — plus a
+# positive-path check that api.linear.app:443 succeeds (http 200).
+#
+# NOTE on the kernel layers: this OPA CONNECT network layer is INDEPENDENT of the
+# Landlock filesystem layer, so the network assertion stays reliable even where
+# Landlock `best_effort` silently degrades on macOS (OpenShell #803 — documented in
+# docs/system-design-tradeoffs.md).
+
+version: 1
+
+# Filesystem layer (OpenShell Landlock, best_effort on macOS). Confines reads/writes
+# to the sandbox; the network allow-list below is the load-bearing, reliable layer.
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /lib64, /bin, /sbin, /etc, /proc, /dev/urandom]
+  read_write: [/tmp, /dev/null, /sandbox]
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+# Network allow-list — deny-by-default. Each named block declares the exact
+# host:port endpoints permitted, with `enforcement: enforce`. The `binaries` list
+# names the executables permitted to use that network policy.
+network_policies:
+  # Linear MCP — the [Brownfield]/[Product] ticket-filing endpoint Hermes uses.
+  linear_api:
+    name: linear-api
+    endpoints:
+      - host: api.linear.app
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: mcp.linear.app
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/curl
+      - path: /bin/curl
+
+  # Telegram — the Hermes gateway messaging channel.
+  telegram_api:
+    name: telegram-api
+    endpoints:
+      - host: api.telegram.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/curl
+      - path: /bin/curl
+
+  # Nous Portal — the cloud inference endpoint (no local GPU on Apple Silicon).
+  nous_inference:
+    name: nous-inference
+    endpoints:
+      - host: inference-api.nousresearch.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: portal.nousresearch.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/curl
+      - path: /bin/curl
+
+  # Web scrape — the PMF researcher's market-research surface. Scoped to the
+  # specific endpoints the loop actually hits rather than an open allow-all.
+  web_scrape:
+    name: web-scrape
+    endpoints:
+      - host: r.jina.ai
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: duckduckgo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: html.duckduckgo.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+    binaries:
+      - path: /usr/bin/curl
+      - path: /bin/curl
