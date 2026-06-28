@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-28T00:10:26+00:00
+- **snapshot captured:** 2026-06-28T20:02:53+00:00
 
 ## Description
 
@@ -206,3 +206,9 @@ executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on
 - [ ] Host-orchestrator MicroVM confinement scoped (or built) with the macOS-bug tradeoffs recorded.
 - [ ] Each rolled-forward item states scope + rationale (done above).
 - [ ] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
+
+---
+
+## Review
+
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.

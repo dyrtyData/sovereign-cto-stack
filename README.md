@@ -71,10 +71,16 @@ and is verifiable before the next begins.
   the PMF consult reads the same collection. Gated by `assert_memory_accumulates.py` (two runs grow
   the count, run 2 recalls run 1, and the recall is **not** re-seeded from `tickets/`); the
   non-gating `diagnose_hermes_mem0_write.py` probes whether the Hermes binary writes mem0 natively.
+- **P3** — **Greptile PR review as a standing ticket instruction:** every filed ticket body now ends
+  with a standing line — _"After you open a PR for this ticket, run Greptile on it (/greptile) and
+  address the findings before requesting merge."_ Fully decoupled (design D-3/D-4): the only in-repo
+  deliverable is that line + the gate `assert_greptile_instruction.py` (reads it back from BOTH the
+  live Linear ticket and the `tickets/<ID>.md` snapshot). No in-repo Greptile code/MCP/webhook — the
+  CLI / `/greptile` command live globally in `~/.claude`, outside this repo.
 
-The rest of **GLO-14** rolls forward: a ticket-instruction Greptile review loop, a real-Linear-UI
-demo ending + read-only memory view, host-orchestrator MicroVM confinement, real shipped-bet
-feedback, and a Moderne paid-tier evaluation.
+The rest of **GLO-14** rolls forward: a real-Linear-UI demo ending + read-only memory view,
+host-orchestrator MicroVM confinement, real shipped-bet feedback, and a Moderne paid-tier
+evaluation.
 
 ## Quick start
 

@@ -247,6 +247,17 @@ THIN: exactly **one** opportunity, **one** ticket, deterministic enough to verif
       supports the opportunity. Cite the UNION — never pre-curate. The string
       `Grounded in:` MUST appear verbatim, at least one citing a real corpus `*.md`.
    6. **Acceptance criteria** — a short checklist so it is actionable as-is.
+   7. **Review (standing instruction — GLO-14 P2)** — end the body with the literal line so
+      whoever builds the capability runs a Greptile PR review before merge:
+
+      ```text
+      After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+      ```
+
+      Append it verbatim — the gate `scripts/assert_greptile_instruction.py` reads this line
+      back from both the live Linear ticket and the `tickets/<ID>.md` snapshot. The Greptile
+      CLI / `/greptile` command live globally in `~/.claude` (an out-of-repo prerequisite, not a
+      GLO-14 repo deliverable); this repo only carries the instruction line.
 
 5. **Confirm by reading the ticket back** (`list_issues(query="[Product]", team=...)`
    or `get_issue`): verify the `Product` label (or the `[Product]` title marker), a

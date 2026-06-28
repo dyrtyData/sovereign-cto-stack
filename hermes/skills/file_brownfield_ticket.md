@@ -116,6 +116,17 @@ The description MUST contain, in order:
    retrieval decide which texts are relevant. The string `Grounded in:` MUST appear
    verbatim, once per cited source.
 7. **Acceptance criteria** — a short checklist so it is actionable as-is.
+8. **Review (standing instruction — GLO-14 P2).** End the body with the literal standing
+   instruction line so whoever picks the ticket up runs a Greptile PR review before merge:
+
+   ```text
+   After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+   ```
+
+   Append it verbatim (the gate `scripts/assert_greptile_instruction.py` reads this line back
+   from both the live Linear ticket and the `tickets/<ID>.md` snapshot). The Greptile CLI /
+   Claude Code skill / `/greptile` command live globally in `~/.claude` (an out-of-repo
+   prerequisite, not a GLO-14 repo deliverable); this repo only carries the instruction line.
 
 ### Template
 
@@ -177,6 +188,9 @@ throughput and deployment performance).
 - [ ] BFF/anti-corruption seam introduced in `src/frontend/` isolating the 7 clients.
 - [ ] `protos/demo.proto` split per bounded context (no single all-service contract).
 - [ ] No service imports another service's stubs directly.
+
+## Review
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
 ```
 
 ## After filing

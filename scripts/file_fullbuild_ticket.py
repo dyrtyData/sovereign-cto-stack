@@ -37,6 +37,16 @@ import linear_mcp as L  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TITLE = "[Full-Build] Sovereign CTO Stack — complete vision (all phases) + prioritized deferred backlog"
 
+# Standing review instruction appended to EVERY filed ticket body (GLO-14 P2 / design D-3/D-4).
+# The gate scripts/assert_greptile_instruction.py reads this exact line back from the live Linear
+# ticket AND the tickets/<ID>.md snapshot. The Greptile CLI/skill/`/greptile` command live globally
+# in ~/.claude (an out-of-repo prerequisite) — this repo only carries the instruction line.
+GREPTILE_INSTRUCTION = (
+    "After you open a PR for this ticket, run Greptile on it (/greptile) "
+    "and address the findings before requesting merge."
+)
+GREPTILE_REVIEW_SECTION = f"\n\n---\n\n## Review\n{GREPTILE_INSTRUCTION}\n"
+
 DESCRIPTION = r"""## What this is
 
 The single comprehensive **full-build epic** for the Sovereign CTO Stack (design Q1): the entire
@@ -480,6 +490,11 @@ def main(argv: list[str]) -> int:
         title, description = TITLE, DESCRIPTION
         issue_id = (rest[0] if rest else None) or os.environ.get("FULLBUILD_ID") or find_existing()
         what = "full-build"
+
+    # Every filed ticket carries the standing Greptile review instruction (GLO-14 P2). Append
+    # it idempotently so re-filing in place doesn't stack duplicate sections.
+    if GREPTILE_INSTRUCTION not in description:
+        description = description.rstrip() + GREPTILE_REVIEW_SECTION
 
     args = {
         "title": title,

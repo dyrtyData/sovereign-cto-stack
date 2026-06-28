@@ -699,6 +699,34 @@ writes `memories` on its own (the deterministic helper stays load-bearing regard
 > Phase-1 mem0 note above); the writer warms the lemma model so the `Failed to load spaCy lemma
 > model` warning is cleared.
 
+## GLO-14 P3 — Greptile PR review as a standing ticket-instruction line
+
+Fully decoupled (design D-3/D-4). Every ticket the loop files now **ends its body with a standing
+instruction line** so whoever picks it up runs a Greptile review on the resulting PR before merge:
+
+> After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings
+> before requesting merge.
+
+The **only** in-repo deliverable is that line — appended by the filing skills
+(`hermes/skills/file_brownfield_ticket.md`, `pmf_brief.md`, `pmf_rank.md`) and the epic filer
+(`scripts/file_fullbuild_ticket.py`) — plus the gate below. There is **no in-repo Greptile code,
+MCP, or webhook**: the Greptile CLI, the Claude Code skill, and the `/greptile` command are set up
+**globally in `~/.claude`, outside this repo** (a separate, project-agnostic task — not a GLO-14
+repo deliverable). The Greptile **GitHub App** is the no-code fallback (auto-reviews on PR-open).
+
+```bash
+uv run scripts/assert_greptile_instruction.py            # PASS: newest filed ticket body + tickets/<ID>.md snapshot both carry the line
+uv run scripts/assert_greptile_instruction.py GLO-14     # or check a specific identifier
+```
+
+`assert_greptile_instruction.py` mirrors `assert_brownfield_ticket.py`: it reads the newest filed
+ticket back over the same Linear MCP endpoint Hermes uses **and** reads the tracked
+`tickets/<ID>.md` snapshot, asserting **both** carry the instruction line (proving it survives the
+full path — agent files it into Linear → `snapshot_tickets.py` persists it into git). The match is
+tolerant of trivial wording-around (it keys on "run Greptile … (/greptile) … address the
+findings"). The appended line is additive, so `assert_brownfield_ticket.py` /
+`assert_product_ticket.py` stay exit-0.
+
 ## Closeout — the comprehensive showcase montage (hybrid montage, design Q6)
 
 The submitted demo is a **hybrid montage**: live split-screen captures for the inherently-visual

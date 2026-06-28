@@ -131,4 +131,10 @@ The rank-1 opportunity becomes the filed `[Product]` Linear ticket (the `pmf_bri
 "turn the brief into ONE filed product opportunity" step files exactly the
 top-ranked one). Its Revenue grounding ties back to Stripe, and it must NOT be one
 the prior decisions already settled (unless explicitly re-raised with a what-changed
-note).
+note). The filed body ends with the standing Greptile review instruction line
+(GLO-14 P2 — `pmf_brief` appends it verbatim; gated by
+`scripts/assert_greptile_instruction.py`):
+
+```text
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+```

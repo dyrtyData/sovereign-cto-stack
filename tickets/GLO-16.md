@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Brownfield
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:35:23+00:00
+- **snapshot captured:** 2026-06-28T20:03:50+00:00
 
 ## Description
 
@@ -55,3 +55,7 @@ Grounded in: lean-enterprise.md (IT performance measured by change lead time, de
 - [ ] The cited SonarQube issue (0e054858-e16b-4d96-983f-f2c08e5fb68e) on `src/checkoutservice/main.go` is resolved in the same change
 - [ ] `protos/demo.proto` split per bounded context (no single all-service contract definition)
 - [ ] Remediation routed to Codegen (named back-end); each resulting deployment unit testable/releasable independently
+
+## Review
+
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.

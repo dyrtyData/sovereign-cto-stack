@@ -603,6 +603,51 @@ option is **rolled forward to Part C** below (and into the next epic's ticket) a
 deliberately-deferred path — *here is exactly how to enable it if a future epic ever wants
 passive capture*, with the load-bearing tradeoff stated up front.
 
+### GLO-14 P3 — Greptile PR review as a standing ticket-instruction line (built; fully decoupled)
+
+**Decision (design D-3/D-4): the ONLY in-repo Greptile deliverable is a standing instruction
+LINE appended to every filed ticket body, plus a gate that reads it back.** There is **no in-repo
+Greptile code, no MCP server, no webhook receiver, and no `query_cto_knowledge` triage** — those
+were considered (the next-epic ticket sketches a webhook→resume→review→triage loop) and
+deliberately **kept out of this repo**. The Greptile CLI, the Claude Code skill, and the
+`/greptile` command are set up **globally in `~/.claude`, OUTSIDE this repo** (a separate,
+project-agnostic task, not a GLO-14 repo deliverable and not tracked here). This repo's surface is
+exactly: the filing skills (`hermes/skills/file_brownfield_ticket.md`, `pmf_brief.md`,
+`pmf_rank.md`) and the epic filer (`scripts/file_fullbuild_ticket.py`) append the literal line —
+
+> _After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings
+> before requesting merge._
+
+— to the end of every `[Brownfield]`/`[Product]`/`[Full-Build]` ticket body, and
+`scripts/assert_greptile_instruction.py` gates it.
+
+**Why decoupled (D-3/D-4).** The sovereign-CTO payoff Greptile adds is "agents that ship *and*
+review," but the *mechanism* that runs the review is project-agnostic developer tooling — it
+belongs in the global `~/.claude` profile that any repo's PRs can use, not baked into this stack.
+Embedding a Greptile MCP/webhook here would (a) couple this repo to a specific review vendor's
+runtime, (b) duplicate setup that already lives globally, and (c) re-introduce an
+inference-hot-path / always-on-service dependency of exactly the kind we rejected for mem0 passive
+capture above. The standing instruction line is the thin, durable, in-repo contract; the heavy
+lifting stays out-of-repo. **The Greptile GitHub App is the no-code fallback** — it auto-reviews
+on PR-open with no custom hook — so even without the global CLI a reviewer path exists; the
+in-repo line just makes "run the review" a non-optional standing instruction on every ticket.
+
+**The gate (mirrors `assert_brownfield_ticket.py`).** `scripts/assert_greptile_instruction.py`
+reads the newest filed ticket back over the SAME Linear MCP endpoint Hermes uses **and** reads the
+tracked `tickets/<ID>.md` snapshot, asserting **both** carry the instruction line. Asserting both
+proves the line survives the full path (agent files it into Linear → `snapshot_tickets.py`
+persists it into git), not just one end. The match is tolerant of trivial wording-around (it keys
+on "run Greptile … (/greptile) … address the findings") so a human copy-edit of the surrounding
+prose doesn't break the gate while the operative instruction stays required. Verified exit 0 on
+the newest `[Brownfield]` ticket (GLO-18) and on the next-epic `[Full-Build]` (GLO-14); the
+unrelated `assert_brownfield_ticket.py` / `assert_product_ticket.py` invariants stay exit 0 (the
+appended line is purely additive — it does not disturb the grounding/label/`src/<service>/`
+checks).
+
+> _Grounded in: *Accelerate* — peer review / fast feedback on every change as a delivery-
+> performance practice; *An Elegant Puzzle* (Larson) — keep project-agnostic tooling out of the
+> product repo and make the standing expectation explicit rather than embedding a vendor runtime._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the
