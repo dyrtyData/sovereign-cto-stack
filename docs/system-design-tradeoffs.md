@@ -528,14 +528,19 @@ decision) into `memories` so mem0 extracts/dedups/entity-links it natively.
 
   > **Recorded Q3 verdict (2026-06-28, this worktree):**
   > `{"verdict": "INCONCLUSIVE", "collection": "memories", "user_id": "sovereign-cto",
-  > "reason": "graphify-out/service-graph.html missing — run scripts/run_graphify.sh first",
+  > "reason": "nous portal inference unreachable at http://127.0.0.1:8645/v1 — start it with
+  > `hermes portal login`; without inference a 0-delta cannot be read as NO_NATIVE_WRITE",
   > "baseline_rows": 4}`
   >
-  > The probe self-skipped to `INCONCLUSIVE` because this worktree has no `graphify-out/` input to
-  > drive a real hero loop (the diagnostic refuses to fabricate a run). On a box with the graphify
-  > artifact present it emits `NATIVE_WRITE_OBSERVED` (bonus) or `NO_NATIVE_WRITE` (confirms the
-  > helper is required). Either way the deterministic helper stays load-bearing — the verdict only
-  > tells us whether native capture is a *complement*, never whether the slice works.
+  > The probe self-skips to `INCONCLUSIVE` until **three** prerequisites hold: the `hermes` binary on
+  > PATH (present), the `graphify-out/service-graph.html` input (now generated via
+  > `scripts/run_graphify.sh`), **and a reachable Nous Portal inference proxy** (`hermes portal login`,
+  > currently down). The Portal reachability guard was added deliberately: without inference the hero
+  > loop produces no decision, so a 0-row delta would be meaningless — emitting `NO_NATIVE_WRITE` in
+  > that state would be a **false negative**, so the probe refuses to guess. With all three present it
+  > emits `NATIVE_WRITE_OBSERVED` (bonus) or `NO_NATIVE_WRITE` (confirms the helper is required).
+  > Either way the deterministic helper stays load-bearing — the verdict only tells us whether native
+  > capture is a *complement*, never whether the slice works.
 
 - **Q4 — `infer=True` (mem0's intended extraction), self-skipping to `infer=False` when Ollama is
   down.** The write feeds mem0 the whole turn so the extraction LLM pulls salient facts, dedups,

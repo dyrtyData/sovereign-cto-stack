@@ -69,6 +69,23 @@ COLLECTION = os.environ.get("MEM0_MEMORIES_COLLECTION", "memories")
 USER_ID = os.environ.get("MEM0_MEMORIES_USER", "sovereign-cto")
 EMBED_DIMS = 384
 HERO_TIMEOUT = int(os.environ.get("DIAG_HERO_TIMEOUT", "150"))
+# The Nous Portal OpenAI-compatible inference proxy the hero loop's `hermes` call
+# routes through (hermes/config.yaml provider: nous; `hermes portal login` starts it).
+PORTAL_BASE = os.environ.get("NOUS_PORTAL_BASE", "http://127.0.0.1:8645/v1")
+
+
+def _portal_reachable() -> bool:
+    """True if the Nous Portal inference proxy answers on /models.
+
+    Without inference the hero loop produces no decision, so a delta of 0 would be
+    meaningless — guarding here prevents a FALSE `NO_NATIVE_WRITE` verdict."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{PORTAL_BASE}/models", timeout=4) as r:
+            return r.status < 500
+    except Exception:
+        return False
 
 
 def _verdict(verdict: str, **extra) -> int:
@@ -121,6 +138,14 @@ def main() -> int:
     if not (REPO_ROOT / "graphify-out" / "service-graph.html").is_file():
         return _verdict("INCONCLUSIVE",
                         reason="graphify-out/service-graph.html missing — run scripts/run_graphify.sh first",
+                        baseline_rows=before)
+    if not _portal_reachable():
+        # Inference is down: the hero loop cannot produce a decision, so a 0-delta
+        # would NOT mean "no native write". Refuse to guess — stay INCONCLUSIVE.
+        return _verdict("INCONCLUSIVE",
+                        reason=("nous portal inference unreachable at "
+                                f"{PORTAL_BASE} — start it with `hermes portal login`; "
+                                "without inference a 0-delta cannot be read as NO_NATIVE_WRITE"),
                         baseline_rows=before)
 
     # Run ONE hero loop with OUR deterministic write DISABLED, so any new `memories`
