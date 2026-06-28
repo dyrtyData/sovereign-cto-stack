@@ -845,6 +845,24 @@ profile Chromium still hits the auth wall, so the snapshot ending remains the sa
 `login` verb clears any stale Chromium `Singleton*` lock before launching (a leftover lock from a
 prior container otherwise makes Chromium exit instantly → a black VNC screen).
 
+**Baking the authenticated ending into the showcase montage.** `build_showcase_video.py`'s
+`linear-ending` segment prefers a real captured clip of the live ticket UI
+(`recordings/auth_ending_*.mp4`) and gracefully falls back to the title card if none exists. To
+capture that clip directly (without a full hero run), navigate the recorder's browser — with the
+persistent profile — to the newest live ticket and grab ~9 s:
+
+```bash
+docker exec sovereigncto-recorder-1 bash -lc '
+  DISPLAY=:99 chromium --no-sandbox --user-data-dir=/recorder-profile --kiosk <ticket-url> & sleep 11
+  ffmpeg -y -f x11grab -video_size 1280x720 -framerate 30 -i :99 -t 9 \
+    -c:v libx264 -preset veryfast -pix_fmt yuv420p /recordings/auth_ending_$(date +%s).mp4'
+uv run scripts/build_showcase_video.py        # picks up the newest auth_ending_*.mp4 as the ending
+```
+
+The clip is marked `skip_verify` because a live ticket page is near-static (the non-static heuristic
+in `verify_recording.py` would otherwise reject it). The montage `.mp4` lives in the gitignored
+`recordings/` — it is the submission artifact, regenerated on demand, not committed.
+
 > **What is automated vs. human here.** The default `file://` path and the persistent-profile
 > **wiring** are both gated: `assert_persistent_profile_wiring.py` drives the real `launch_browser`
 > path with a throwaway `--user-data-dir` and asserts the recorder launched Chromium **with** the
