@@ -6,7 +6,7 @@
 - **status:** Backlog
 - **labels:** Brownfield
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-28T21:12:18+00:00
+- **snapshot captured:** 2026-06-28T21:26:36+00:00
 
 ## Description
 
@@ -43,3 +43,7 @@ Grounded in: accelerate.md (loosely-coupled architecture is the key architectura
 - [ ] gRPC contracts split per bounded context (no single all-service contract shared by all consumers).
 - [ ] No service directly imports another service's generated stubs across bounded-context boundaries.
 - [ ] `src/frontend/main.go` outbound degree reduced from 7 to ≤3 (the BFF plus necessary cross-cutting concerns).
+
+## Review
+
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.

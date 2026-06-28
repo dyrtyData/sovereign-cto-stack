@@ -3,10 +3,10 @@
 - **identifier:** GLO-9
 - **url:** https://linear.app/global-south-ai-safety/issue/GLO-9/brownfield-frontend-is-a-7-service-grpc-coupling-hub-introduce-a
 - **team:** Global South Ai Safety
-- **status:** Backlog
+- **status:** Canceled
 - **labels:** Brownfield
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:35:18+00:00
+- **snapshot captured:** 2026-06-28T21:26:34+00:00
 
 ## Description
 

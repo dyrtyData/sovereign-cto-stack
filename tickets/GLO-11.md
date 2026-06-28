@@ -3,10 +3,10 @@
 - **identifier:** GLO-11
 - **url:** https://linear.app/global-south-ai-safety/issue/GLO-11/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-bff
 - **team:** Global South Ai Safety
-- **status:** Backlog
+- **status:** Canceled
 - **labels:** Brownfield
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:35:19+00:00
+- **snapshot captured:** 2026-06-28T21:26:35+00:00
 
 ## Description
 
