@@ -648,6 +648,58 @@ checks).
 > performance practice; *An Elegant Puzzle* (Larson) — keep project-agnostic tooling out of the
 > product repo and make the standing expectation explicit rather than embedding a vendor runtime._
 
+### GLO-14 P5 — Close the PMF North Star loop: a Stripe-grounded shipped-bet flip (built)
+
+**Decision (design D-5, Option C): flip `pmf_ledger.json[].shipped false -> true` from a
+recorded shipped-result that is GROUNDED in real Stripe data — so "shipped" means a
+*measured* outcome, never a hand-set flag.** The Backlog-P4 PMF loop ranks opportunities and
+stamps each `shipped: false`, and the North Star metric is `opportunities_shipped` — but
+nothing ever flipped a row, so the loop proposed forever and never closed. This slice adds the
+missing feedback edge.
+
+**What's built.** `scripts/pmf_shipped_results.py` is a small, deterministic module with two
+pieces, the `fuse_signals.py` additive/atomic pattern throughout:
+
+- a SHIPPED-RESULT RECORD, `recordings/shipped_results.json` — one entry per shipped bet
+  (`bet_id` + measured `metric`/`value` + the `stripe_metrics.json` grounding ref);
+- a DETERMINISTIC JOINER, `flip_shipped(ledger, results, stripe_metrics) -> int`, that joins
+  the records onto the ledger by bet id (the opportunity title or its rank), flips each
+  matching row `shipped false -> true`, and stamps `grounded_in += ["stripe_metrics.json"]`
+  (idempotent — never duplicated). It reads the WHOLE ledger, mutates only the target rows,
+  and writes the whole doc back via `os.replace` — **never clobbering any other ledger key**
+  (`question`, `scoring_model`, `prior_decisions_consulted`, the unrelated opportunities).
+
+It is wired into `scripts/pmf_kanban_run.sh` immediately after the ledger write: a no-op (0
+rows) on a default run with no recorded result, and a real flip when a result has been
+recorded. A flip is **itself a decision**, so each flipped row is recorded into the unified
+mem0 `memories` collection via the Phase-2 `mem0_record_decision.py` helper (sequenced after
+P1's write path closed, exactly as this phase depends on).
+
+**Decision: GROUNDED, not asserted — refuse to flip on a fabricated number.** A shipped-result
+is honored **only** when its recorded metric value equals a value actually present in
+`recordings/stripe_metrics.json` (the real test-mode MRR/churn/cohort figures
+`scripts/stripe_client.py` computes from the live Stripe API). A record whose value is not a
+real Stripe figure is REFUSED — the same no-fabrication contract that runs through
+`stripe_client.py`. No new Stripe surface and no new egress endpoint were added: the joiner
+reuses the already-computed `stripe_metrics.json` artifact via a tiny additive
+`stripe_client.load_metrics()` read helper (no API re-hit).
+
+**The gate.** `scripts/assert_shipped_flip.py` seeds a `shipped_results.json` for a known bet
+(the rank-1 opportunity, grounded in the real MRR read straight out of `stripe_metrics.json`),
+runs the joiner on an **isolated temp copy** of the ledger (mirroring how
+`assert_memory_accumulates.py` uses a throwaway collection — the real tracked
+`recordings/pmf_ledger.json` is never mutated and stays all-false), and asserts: the target
+bet flipped to `true`; its `grounded_in` cites `stripe_metrics.json`; the recorded metric value
+EQUALS a real `stripe_metrics.json` value (the MRR/churn cross-read — "measured real outcome");
+every unrelated opportunity stayed `false`; and every other ledger key is preserved
+byte-for-byte. `scripts/assert_pmf_ranked.py` stays exit 0 (the ledger schema + ranking
+invariants are untouched — `shipped` and `shipped_result` are additive fields).
+
+> _Grounded in: *Hacking Growth* — a North Star (opportunities **shipped**) measured from real
+> outcomes over vanity output; *Lean Analytics* / *The Lean Product Playbook* — validate a bet
+> against a real revenue/retention metric, not a self-asserted flag; *Accelerate* —
+> deterministic, reproducible, gate-able state changes over hand edits._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

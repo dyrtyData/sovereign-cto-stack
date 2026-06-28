@@ -727,6 +727,40 @@ tolerant of trivial wording-around (it keys on "run Greptile … (/greptile) …
 findings"). The appended line is additive, so `assert_brownfield_ticket.py` /
 `assert_product_ticket.py` stay exit-0.
 
+## GLO-14 P5 — Close the PMF North Star loop (Stripe-grounded shipped-bet flip)
+
+The Backlog-P4 PMF loop ranks opportunities into `recordings/pmf_ledger.json`, each born
+`shipped: false`, and the North Star metric is `opportunities_shipped` — but nothing flipped a row,
+so the loop never *closed*. P5 adds the feedback edge (design D-5 Option C): a small, deterministic,
+**Stripe-grounded** joiner flips a row `false → true` from a recorded, *measured* outcome.
+
+```bash
+# 1. record a shipped-result for a bet — the metric VALUE must match real Stripe data
+#    (run scripts/stripe_client.py first to refresh recordings/stripe_metrics.json)
+python3 scripts/pmf_shipped_results.py record --bet 1 --metric mrr --value 1281.0
+# 2. flip every recorded shipped-result onto the ledger (atomic, additive, idempotent)
+python3 scripts/pmf_shipped_results.py flip
+# the gate — seeds a known bet, flips an ISOLATED temp copy, cross-reads the metric vs Stripe
+uv run scripts/assert_shipped_flip.py                    # PASS: target flips true; grounded in real Stripe; others stay false
+python3 scripts/assert_pmf_ranked.py                     # still PASS: shipped/shipped_result are additive fields
+```
+
+`scripts/pmf_shipped_results.py` reads/writes `recordings/shipped_results.json` (bet id + measured
+metric + the `stripe_metrics.json` grounding ref) and exposes `flip_shipped(ledger, results,
+stripe_metrics) -> int`: it joins records onto the ledger by bet id (the opportunity **title** or
+its **rank**), flips matching rows `shipped false → true`, and stamps `grounded_in +=
+["stripe_metrics.json"]` — reading the whole ledger and writing it back via `os.replace` so **no
+other ledger key is clobbered** (the `fuse_signals.py` atomic/additive pattern). A result is
+**refused** unless its metric value equals a value actually present in `recordings/stripe_metrics.json`
+(the no-fabrication contract — "shipped" must be a *measured* Stripe outcome, not a hand-set flag);
+no new Stripe surface or egress endpoint is added (it reuses the already-computed metrics artifact via
+`stripe_client.load_metrics()`). The joiner is wired into `scripts/pmf_kanban_run.sh` right after the
+ledger write (a no-op when nothing is recorded), and each flip — itself a decision — is recorded into
+the unified `memories` collection via `mem0_record_decision.py` (depends on P2's write path).
+`assert_shipped_flip.py` operates on an **isolated temp copy** of the ledger (mirroring
+`assert_memory_accumulates.py`'s throwaway collection) so the tracked `recordings/pmf_ledger.json`
+stays all-false and the working tree stays clean.
+
 ## Closeout — the comprehensive showcase montage (hybrid montage, design Q6)
 
 The submitted demo is a **hybrid montage**: live split-screen captures for the inherently-visual

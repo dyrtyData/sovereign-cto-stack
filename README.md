@@ -77,10 +77,16 @@ and is verifiable before the next begins.
   deliverable is that line + the gate `assert_greptile_instruction.py` (reads it back from BOTH the
   live Linear ticket and the `tickets/<ID>.md` snapshot). No in-repo Greptile code/MCP/webhook — the
   CLI / `/greptile` command live globally in `~/.claude`, outside this repo.
+- **P5** — **Close the PMF North Star loop:** a recorded, **Stripe-grounded** shipped-result flips a
+  `pmf_ledger.json` row `shipped: false → true` so "shipped" means a *measured* outcome
+  (`pmf_shipped_results.py` — a deterministic, atomic joiner; design D-5 Option C). The flip is
+  refused unless the recorded metric value equals a real value in `recordings/stripe_metrics.json`
+  (no fabricated outcome), and each flip is recorded into `memories` as its own decision (depends on
+  P2). Gated by `assert_shipped_flip.py` (flips a known bet on an isolated temp copy, cross-reads the
+  metric against real Stripe data, and proves unrelated rows stay false — the real ledger untouched).
 
 The rest of **GLO-14** rolls forward: a real-Linear-UI demo ending + read-only memory view,
-host-orchestrator MicroVM confinement, real shipped-bet feedback, and a Moderne paid-tier
-evaluation.
+host-orchestrator MicroVM confinement, and a Moderne paid-tier evaluation.
 
 ## Quick start
 

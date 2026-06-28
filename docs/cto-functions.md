@@ -88,6 +88,15 @@ accumulate each run (GLO-14 P2 closed the write path + repointed this read), plu
 autonomous-remediation idea). `scripts/assert_pmf_ranked.py` gates ≥2 scored, ranked, grounded
 opportunities + a non-empty "Prior decisions consulted" section.
 
+**GLO-14 P5 — the North Star loop now CLOSES (Stripe-grounded shipped flip).** The `shipped`
+field is no longer write-once-`false`: a recorded, **Stripe-grounded** shipped-result flips a
+ledger row `false → true` via the deterministic joiner `scripts/pmf_shipped_results.py`
+(`flip_shipped(...)`, atomic/additive). "Shipped" therefore means a *measured* outcome — the
+recorded metric must equal a real value in `recordings/stripe_metrics.json` or the flip is
+refused — so the North Star (`opportunities_shipped`) is grounded in real Stripe data, not a
+hand-set flag. Each flip is recorded into the unified `memories` collection as its own decision.
+`scripts/assert_shipped_flip.py` gates it on an isolated ledger copy.
+
 **Grounding dimensions → texts:**
 
 | Dimension queried | Texts surfaced |

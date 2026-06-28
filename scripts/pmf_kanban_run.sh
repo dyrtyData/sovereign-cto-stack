@@ -361,6 +361,70 @@ log "completing task $TASK_ID with structured handoff (-> done)"
   --result "$SUMMARY" \
   --metadata "$METADATA" >/dev/null
 
+# --- 4a. CLOSE THE PMF NORTH STAR LOOP (GLO-14 P5) ---------------------------
+# Every opportunity the ranking step wrote to the ledger is born shipped:false.
+# After the ledger write, run the deterministic Stripe-grounded joiner: if a
+# shipped-result has been recorded (recordings/shipped_results.json), it flips the
+# matching ledger row false->true and stamps grounded_in with stripe_metrics.json,
+# so "shipped" means a MEASURED real outcome (design D-5 Option C). The flip is
+# additive/atomic (the fuse_signals.py pattern) and a no-op (0 rows) when nothing
+# has been recorded yet — the default run leaves the ledger all-false. A flip is
+# itself a decision, so any flipped row is recorded into mem0 below (sequenced after
+# P1's write path). Refuses to flip on a metric that is not in real Stripe data.
+FLIPPED=0
+if command -v uv >/dev/null 2>&1; then
+  FLIP_OUT="$(uv run "$REPO_ROOT/scripts/pmf_shipped_results.py" flip 2>&1)" || {
+    echo "pmf_kanban_run: shipped-result flip failed (a recorded metric did not match real Stripe data?)." >&2
+    echo "$FLIP_OUT" >&2
+    exit 1
+  }
+else
+  FLIP_OUT="$(python3 "$REPO_ROOT/scripts/pmf_shipped_results.py" flip 2>&1)" || {
+    echo "pmf_kanban_run: shipped-result flip failed." >&2; echo "$FLIP_OUT" >&2; exit 1; }
+fi
+echo "$FLIP_OUT"
+FLIPPED="$(printf '%s' "$FLIP_OUT" | python3 -c 'import sys,re
+m=re.search(r"flipped (\d+) ledger row", sys.stdin.read()); print(m.group(1) if m else 0)' 2>/dev/null || echo 0)"
+log "PMF North Star flip: ${FLIPPED} ledger row(s) flipped shipped false->true"
+
+# Record each North Star flip as a decision in the unified `memories` collection
+# (the flip is itself a decision — design D-5; sequenced after P1's mem0 write path).
+record_shipped_flips_to_mem0() {
+  [ "${FLIPPED:-0}" = "0" ] && { log "no rows flipped this run — no flip decision to record"; return 0; }
+  [ "${MEM0_RECORD_DECISION_DISABLE:-0}" = "1" ] && { log "mem0 record-decision DISABLED (probe mode) — skipping flip-decision write"; return 0; }
+  command -v uv >/dev/null 2>&1 || { log "uv not found — cannot record the flip decision to mem0"; return 0; }
+  docker compose up -d mem0-postgres >/dev/null 2>&1 || true
+  # one decision row per just-flipped opportunity (grounded in stripe_metrics.json)
+  LEDGER="$LEDGER" TS="$TS" python3 - <<'PY' 2>/dev/null | while IFS= read -r line; do
+import json, os
+from pathlib import Path
+L = json.loads(Path(os.environ["LEDGER"]).read_text())
+for o in L.get("opportunities", []):
+    sr = o.get("shipped_result")
+    if o.get("shipped") is True and sr:
+        print(json.dumps({
+            "title": o.get("title", ""),
+            "metric": sr.get("metric"), "value": sr.get("value"),
+        }))
+PY
+    [ -n "$line" ] || continue
+    f_title="$(printf '%s' "$line" | python3 -c 'import sys,json;print(json.load(sys.stdin)["title"])')"
+    f_metric="$(printf '%s' "$line" | python3 -c 'import sys,json;print(json.load(sys.stdin)["metric"])')"
+    f_value="$(printf '%s' "$line" | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')"
+    log "recording North Star flip decision for '$f_title' into mem0 'memories'"
+    uv run "$REPO_ROOT/scripts/mem0_record_decision.py" \
+      --profile cto-market --run-id "pmf_run_${TS}" \
+      --ticket-id "SHIPPED-${TS}" --kind shipped_flip \
+      --grounding-question "Which ranked PMF bet has shipped a measured outcome this run?" \
+      --ticket-title "[Shipped] ${f_title}" \
+      --grounded-summary "North Star flip: bet shipped=true, grounded in real Stripe ${f_metric}=${f_value} (stripe_metrics.json)." \
+      --grounded-in stripe_metrics.json \
+      && log "flip decision recorded for '$f_title'" \
+      || log "flip-decision mem0 write failed (non-fatal — git/ledger remain authoritative)"
+  done
+}
+record_shipped_flips_to_mem0
+
 # --- 4b. CLOSE THE mem0 WRITE PATH (GLO-14 P1) -------------------------------
 # The load-bearing GLO-14 slice, same canonical position as the hero loop: AFTER
 # the ledger/Kanban-complete write returns and BEFORE snapshot_after_run.sh. We
