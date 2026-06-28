@@ -498,6 +498,83 @@ CI never depends on a local LLM while a dev box with Ollama proves the link auto
 > _Grounded in: *Accelerate* — pin and gate dependency changes so a working increment is always
 > reproducible; mem0 as a recall complement over the authoritative git history (never a dependency)._
 
+### GLO-14 P2 — Close the mem0 write path: `memories` accumulates every run (built; the load-bearing slice)
+
+**Decision (design Q2/Q3/Q4): a deterministic Python writer closes the loop, into the unified
+`memories` collection, with `infer=True`.** GLO-13 left the system able to *read* prior decisions
+but never *write* new ones, so the `memories` collection never accumulated — the headline GLO-14
+gap (the user's explicit request). This slice inserts `scripts/mem0_record_decision.py` at the
+single canonical position research pins in **both** agent loops — AFTER `save_issue` returns a
+ticket id and BEFORE `snapshot_after_run.sh` (`scripts/record_run.sh` step 7b;
+`scripts/pmf_kanban_run.sh` step 4b) — writing the full agent turn (grounding question + filed
+decision) into `memories` so mem0 extracts/dedups/entity-links it natively.
+
+- **Q2 — unify on `memories`.** The PMF consult (`scripts/mem0_pmf_decisions.py`) now *reads* the
+  same `memories` collection (`user_id="sovereign-cto"`) the writer writes, instead of the old
+  isolated `pmf_decisions` silo nobody else touched — so recall is real, not theatre. The
+  idempotent seed of the tracked `tickets/[Product]` snapshots is preserved (so a fresh box still
+  has prior decisions before any `agent_run` write lands) but tagged `source:"ticket_seed"` to stay
+  distinct from accumulated `source:"agent_run"` decisions. Verified: the repointed consult returns
+  the seeded `GLO-12` decision **and** the loop's own `agent_run` writes, and
+  `assert_pmf_ranked.py` stays exit-0 with `prior_decisions_consulted.mem0_hits` populated from
+  `memories`.
+- **Q3 — the deterministic helper is load-bearing; the Hermes-native path is a *probe*, not a
+  dependency.** Passive capture is unavailable for this stack (inference routes through the Nous
+  Portal proxy, not mem0's OpenAI-compatible proxy), so an explicit `add()` is the only guaranteed
+  mechanism. Whether the closed-source `hermes-agent` binary *also* writes `memories` on its own via
+  `hermes/mem0.json` is answered empirically — not left open — by the non-gating diagnostic
+  `scripts/diagnose_hermes_mem0_write.py`, which runs one loop with the helper disabled
+  (`MEM0_RECORD_DECISION_DISABLE=1`) and reports a machine-readable verdict.
+
+  > **Recorded Q3 verdict (2026-06-28, this worktree):**
+  > `{"verdict": "INCONCLUSIVE", "collection": "memories", "user_id": "sovereign-cto",
+  > "reason": "graphify-out/service-graph.html missing — run scripts/run_graphify.sh first",
+  > "baseline_rows": 4}`
+  >
+  > The probe self-skipped to `INCONCLUSIVE` because this worktree has no `graphify-out/` input to
+  > drive a real hero loop (the diagnostic refuses to fabricate a run). On a box with the graphify
+  > artifact present it emits `NATIVE_WRITE_OBSERVED` (bonus) or `NO_NATIVE_WRITE` (confirms the
+  > helper is required). Either way the deterministic helper stays load-bearing — the verdict only
+  > tells us whether native capture is a *complement*, never whether the slice works.
+
+- **Q4 — `infer=True` (mem0's intended extraction), self-skipping to `infer=False` when Ollama is
+  down.** The write feeds mem0 the whole turn so the extraction LLM pulls salient facts, dedups,
+  and entity-links (`>= v2.0.0` native). When the local Ollama fact-extractor is unreachable the
+  helper degrades to `infer=False` (the raw turn still persists, the collection still accumulates,
+  recall extraction is skipped) and logs the downgrade — mirroring the round-trip's Ollama self-skip
+  so CI never depends on a local LLM. The write **never** silently no-ops: a row always lands,
+  tagged `source:"agent_run"` + `decision_id`.
+
+**The gate (design Q5 — tolerant of `infer=True` phrasing).** `scripts/assert_memory_accumulates.py`
+drives the writer twice in an *isolated* `memacc_<uuid>` collection (so it neither depends on nor
+pollutes the live `memories`) and asserts, scripted: the `source:"agent_run"` count grew after each
+run; a `search()` for run 2's topic returns run 2's `decision_id`; run 2 *also* recalls run 1's
+`decision_id` (accumulation, not overwrite); and the recalled decision text is **not a substring of
+any `tickets/*.md`** — the load-bearing "accumulated via the write path, not re-seeded from the git
+snapshots" proof. Verified exit 0 (run 1: 0→2 rows, run 2: 2→4 rows, both decision ids recalled,
+no ticket-substring leak).
+
+**spaCy lemmatization (`mem0ai[nlp]`) — the hybrid LEXICAL index now uses real lemmas.** mem0 OSS
+`>= v2.0.0` builds a hybrid retrieval index whose lexical half is a Postgres
+`gin to_tsvector('simple', payload->>'text_lemmatized')` over a *lemmatized* copy of each memory.
+Without spaCy, mem0 logged **`Failed to load spaCy lemma model`** and fell back to a simpler
+tokenizer (worse keyword recall). We pinned the **`mem0ai[nlp]`** extra (which pulls spaCy) in every
+mem0-touching script's PEP 723 header — the three new ones (`mem0_record_decision.py`,
+`assert_memory_accumulates.py`, `diagnose_hermes_mem0_write.py`) and the two existing
+(`mem0_roundtrip.py`, `mem0_pmf_decisions.py`) — changing `"mem0ai>=2.0.0,<3.0.0"` →
+`"mem0ai[nlp]>=2.0.0,<3.0.0"`. spaCy also needs the `en_core_web_sm` model: the writer proactively
+warms mem0's own lemma loader, which downloads the model once if missing and otherwise **degrades
+with a logged note** (never hard-fails — same Ollama-style self-skip philosophy). Verified: across
+the `record_decision` smoke, the accumulation gate, and the NO_AGENT PMF loop the logs now read
+`spaCy lemma model loaded` / `spaCy lemma model ready` and the `Failed to load spaCy lemma model`
+warning is **gone**; persisted rows carry a populated `text_lemmatized` (e.g. `couple coupling`,
+`refactore refactoring`), confirming the lexical index is lemmatized.
+
+> _Grounded in: *Accelerate* — close the feedback loop so the system learns from its own delivered
+> work; *An Elegant Puzzle* (Larson) — a guaranteed deterministic mechanism over a probabilistic
+> one for a step that must happen every run. Git history stays the authoritative decision record;
+> mem0 is the recall complement that must never become load-bearing for correctness._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

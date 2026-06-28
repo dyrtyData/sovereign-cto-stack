@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.14"
 # dependencies = [
-#   "mem0ai>=2.0.0,<3.0.0",
+#   "mem0ai[nlp]>=2.0.0,<3.0.0",
 #   "sentence-transformers",
 #   "vecs",
 #   "psycopg2-binary",
@@ -65,10 +65,16 @@ EMBED_DIMS = 384  # all-MiniLM-L6-v2
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("MEM0_OLLAMA_MODEL", "qwen2.5-coder:14b")
 
-# Stable collection so re-runs read the same persisted decision memory (idempotent
-# seed below keeps it from growing unboundedly).
-COLLECTION = os.environ.get("MEM0_PMF_COLLECTION", "pmf_decisions")
-USER_ID = os.environ.get("MEM0_PMF_USER", "sovereign-cto-pmf")
+# GLO-14 P1 (design Q2 — UNIFY): the consult now READS the same `memories`
+# collection that scripts/mem0_record_decision.py WRITES (user_id "sovereign-cto"),
+# so recall is real — the PMF loop recalls the decisions the agent loops actually
+# accumulated, not a separate `pmf_decisions` silo nobody else touches. The idempotent
+# seed of the tracked `tickets/[Product]` snapshots is preserved so a fresh box still
+# has prior product decisions to recall before any agent_run write has landed; those
+# seeded rows are tagged source:"ticket_seed" to stay distinct from accumulated
+# source:"agent_run" decisions. Overridable for tests.
+COLLECTION = os.environ.get("MEM0_PMF_COLLECTION", os.environ.get("MEM0_MEMORIES_COLLECTION", "memories"))
+USER_ID = os.environ.get("MEM0_PMF_USER", os.environ.get("MEM0_MEMORIES_USER", "sovereign-cto"))
 
 CONFIG = {
     "llm": {
@@ -157,7 +163,8 @@ def _seed(mem: Memory, tickets: list[dict]) -> None:
             fact,
             user_id=USER_ID,
             infer=False,
-            metadata={"decision_id": decision_id, "kind": "product_decision"},
+            metadata={"decision_id": decision_id, "kind": "product_decision",
+                      "source": "ticket_seed"},
         )
 
 

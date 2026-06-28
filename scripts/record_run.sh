@@ -394,10 +394,86 @@ if command -v python3 >/dev/null 2>&1; then
     echo "record_run: verification FAILED for $OUT_PATH" >&2; exit 1; }
 fi
 
+# --- 7b. CLOSE THE mem0 WRITE PATH (GLO-14 P1) -------------------------------
+# The load-bearing GLO-14 slice. Research pins a single canonical position for the
+# "record this decision to mem0" step — AFTER save_issue returns a ticket id and
+# BEFORE snapshot_after_run.sh runs (this very point). We resolve the just-filed
+# ticket, then write the full agent turn into the unified `memories` collection via
+# scripts/mem0_record_decision.py (infer=True; mem0 extracts/dedups/entity-links).
+# Git stays the authoritative record (snapshot below); mem0 is the recall complement,
+# so this step is BEST-EFFORT and never fails the recording. Disable for a probe via
+# MEM0_RECORD_DECISION_DISABLE=1 (used by diagnose_hermes_mem0_write.py).
+record_decision_to_mem0() {
+  local prefix="$1" kind="$2" question="$3"
+  [ "${MEM0_RECORD_DECISION_DISABLE:-0}" = "1" ] && { log "mem0 record-decision DISABLED (probe mode) — skipping the deterministic write"; return 0; }
+  command -v uv >/dev/null 2>&1 || { log "uv not found — cannot record decision to mem0 (snapshot still authoritative)"; return 0; }
+  docker compose up -d mem0-postgres >/dev/null 2>&1 || true
+  # Resolve the just-filed ticket id + title + grounded summary from the tracked
+  # snapshot if present, else from the newest matching tickets/<ID>.md. (No Linear
+  # call needed — git is the source of truth, and snapshot_after_run runs next.)
+  local meta
+  meta="$(PREFIX="$prefix" python3 - <<'PY' 2>/dev/null || true
+import json, re, sys
+from pathlib import Path
+import os
+root = Path(__file__).resolve().parent.parent if False else Path.cwd()
+tdir = root / "tickets"
+prefix = os.environ.get("PREFIX", "")
+cands = sorted(tdir.glob("GLO-*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+chosen = None
+for p in cands:
+    head = p.read_text(errors="ignore")[:500]
+    m = re.search(r"^#\s+(.*)$", head, re.M)
+    title = m.group(1) if m else ""
+    if not prefix or prefix in title:
+        chosen = (p, title); break
+if not chosen:
+    sys.exit(0)
+p, title = chosen
+text = p.read_text(errors="ignore")
+# grounded sources: every "Grounded in: <file>.md" the ticket cites
+grounded = sorted(set(re.findall(r"Grounded in:[^\n]*?([A-Za-z0-9_\-]+\.md)", text, re.I)))
+# grounded summary: the first paragraph after the heading (the WHY), trimmed
+body = re.sub(r"^#.*$", "", text, flags=re.M).strip()
+body = " ".join(body.split())[:600]
+print(json.dumps({"ticket_id": p.stem, "title": title, "grounded_in": grounded, "summary": body}))
+PY
+)"
+  if [ -z "$meta" ]; then log "no filed ticket snapshot to record to mem0 yet (skipping write; snapshot still runs)"; return 0; fi
+  local ticket_id title grounded_summary
+  ticket_id="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["ticket_id"])' 2>/dev/null || true)"
+  title="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["title"])' 2>/dev/null || true)"
+  grounded_summary="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["summary"])' 2>/dev/null || true)"
+  [ -n "$ticket_id" ] || { log "could not resolve a ticket id for the mem0 write (skipping)"; return 0; }
+  local args=(--profile "$([ "$JOB" = pmf ] && echo cto-market || echo cto-architecture)"
+              --run-id "run_${JOB}_${TS}" --ticket-id "$ticket_id" --kind "$kind"
+              --grounding-question "$question" --ticket-title "$title"
+              --grounded-summary "${grounded_summary:-$title}")
+  # one --grounded-in per cited source_file
+  while IFS= read -r g; do [ -n "$g" ] && args+=(--grounded-in "$g"); done < <(printf '%s' "$meta" | python3 -c 'import sys,json
+[print(x) for x in json.load(sys.stdin).get("grounded_in",[])]' 2>/dev/null || true)
+  log "recording the just-filed decision ($ticket_id) into mem0 'memories' (infer=True; the GLO-14 write path)"
+  uv run "$REPO_ROOT/scripts/mem0_record_decision.py" "${args[@]}" \
+    && log "mem0 decision recorded ($ticket_id) — memories will accumulate this run" \
+    || log "mem0 decision write failed (non-fatal — git snapshot remains authoritative)"
+}
+
+if [ "${NO_AGENT:-0}" != "1" ] && ! is_segment "$JOB"; then
+  if [ "$JOB" = "pmf" ]; then
+    record_decision_to_mem0 "[Product]" "product_decision" \
+      "PMF research run: which product opportunity should we pursue and why (grounded in the corpus + Stripe)?"
+  else
+    record_decision_to_mem0 "[Brownfield]" "brownfield_decision" \
+      "Tech-debt audit run: which coupling hub should we refactor and why (grounded in the CTO corpus)?"
+  fi
+fi
+
 # --- 8. persist any ticket the live run filed into git (Phase-5 wiring) ------
 # A live hero/pmf run files a Linear ticket; git history is the authoritative decision
 # record, so refresh the tracked tickets/<ID>.md snapshots. Non-fatal: a missing Linear
-# token (e.g. NO_AGENT pipeline check) must not fail the recording.
+# token (e.g. NO_AGENT pipeline check) must not fail the recording. NOTE: the mem0
+# write (7b) deliberately precedes this snapshot — the canonical "after save_issue,
+# before snapshot" position research pins for the decision-capture step.
 if [ "${NO_AGENT:-0}" != "1" ] && ! is_segment "$JOB"; then
   log "snapshotting filed ticket(s) into git (tickets/)"
   bash "$REPO_ROOT/scripts/snapshot_after_run.sh" 2>/dev/null || \

@@ -79,13 +79,24 @@ local **Ollama** endpoint for fact extraction, so no external embedding/LLM key 
 Platform mode is the fallback: set `MEM0_API_KEY` and switch `hermes/mem0.json` `mode` to
 `platform` (design Q6).
 
-mem0 OSS is **pinned to `mem0ai>=2.0.0,<3.0.0`** (GLO-14 P1, design D-1; tested against
+mem0 OSS is **pinned to `mem0ai[nlp]>=2.0.0,<3.0.0`** (GLO-14 P1/P2, design D-1; tested against
 `2.0.10`). v2.0.0 standardised the SDK return shape (`add()`/`search()` always return a dict
 with a `results` list) and ships **native entity-linking** baked into `infer=True` fact
 extraction — so the "graph logic" is handled under the hood with **no external graph DB and no
 Neo4j**. We do not configure `graph_store`, so there is nothing to remove and `hermes/mem0.json`
 loads unchanged under v2.0.0. The pin lives in the PEP 723 inline-dependency headers of the
-`scripts/mem0_*.py` smoke scripts; `uv` resolves it per-run.
+`scripts/mem0_*.py` scripts (`mem0_roundtrip.py`, `mem0_pmf_decisions.py`, and the GLO-14 P2
+`mem0_record_decision.py` / `assert_memory_accumulates.py` / `diagnose_hermes_mem0_write.py`);
+`uv` resolves it per-run.
+
+**Why the `[nlp]` extra (GLO-14 P2):** mem0 `>= v2.0.0` builds a hybrid LEXICAL index — a Postgres
+`gin to_tsvector(... payload->>'text_lemmatized')` over a *lemmatized* copy of each memory. Without
+spaCy, mem0 logs `Failed to load spaCy lemma model` and falls back to a simpler tokenizer (weaker
+keyword recall). The `mem0ai[nlp]` extra pulls spaCy; the scripts warm mem0's own lemma loader,
+which downloads the `en_core_web_sm` model once on first run and otherwise **degrades with a logged
+note** (a missing model never hard-fails the gate — same self-skip philosophy as the Ollama path).
+After this, the logs read `spaCy lemma model loaded` and persisted rows carry a populated
+`text_lemmatized`. The first `uv run` of these scripts will download spaCy + `en_core_web_sm`.
 
 Prove persistence (add a fact → `search()` returns it with a score), the v2.0.0 return-shape
 contract, and — when the local Ollama fact-extractor is reachable — the `infer=True` native
@@ -643,9 +654,11 @@ Extends the thin PMF loop to the full version: **multiple opportunities ranked R
 in real usage + Stripe data (P2), with a `shipped`-bet feedback ledger (North Star: opportunities
 shipped). Before ranking it **consults prior decisions** so it neither re-proposes a decided idea
 nor loses past rationale — two real local sources: **self-hosted mem0** (pgvector `mem0-postgres`,
-seeded from the tracked `tickets/[Product]` snapshots) and **git/GitHub history** (`git log` over
-`tickets/`). **No graceful degradation:** if mem0 can't persist/retrieve, the run FAILS rather than
-fabricating "no prior decisions".
+the unified **`memories`** collection — GLO-14 P2 repointed the consult here from the old
+`pmf_decisions` silo, so it now recalls the decisions the agent loops actually accumulate, plus the
+idempotent seed of the tracked `tickets/[Product]` snapshots) and **git/GitHub history** (`git log`
+over `tickets/`). **No graceful degradation:** if mem0 can't persist/retrieve, the run FAILS rather
+than fabricating "no prior decisions".
 
 ```bash
 docker compose up -d mem0-postgres                      # the mem0 backend the consult round-trips
@@ -658,9 +671,33 @@ The brief carries a **"Prior decisions consulted"** section citing mem0 hits + g
 ledger records `rice_score`, `shipped`, and `prior_decisions_consulted`. The loop correctly does
 **not** re-propose the already-decided GLO-12 autonomous-remediation bet.
 
-> **mem0 today writes only the consult/seed path; passive long-lived capture (every run accumulates
-> into the `memories` collection) is the headline GLO-14 item** — see
-> [`../tickets/GLO-14.md`](../tickets/GLO-14.md).
+## GLO-14 P2 — Close the mem0 write path: `memories` accumulates every run
+
+The headline GLO-14 slice (the user's explicit request). Both agent loops now **record the
+just-filed decision into the unified `memories` collection** at the canonical position — AFTER
+`save_issue` returns a ticket id and BEFORE `snapshot_after_run.sh` — via
+`scripts/mem0_record_decision.py` (full agent turn, `infer=True`, self-skipping to `infer=False`
+when Ollama is down). The collection genuinely accumulates run-over-run, and the PMF consult above
+reads the same collection, so recall is real. Git history stays the authoritative record; mem0 is
+the recall complement.
+
+```bash
+docker compose up -d mem0-postgres                      # the pgvector backend the writer persists into
+uv run scripts/assert_memory_accumulates.py             # PASS: two runs both grow the count; run 2 recalls run 1; not re-seeded from tickets/
+uv run scripts/diagnose_hermes_mem0_write.py            # NON-GATING Q3 probe: does hermes-agent write `memories` natively? (machine-readable verdict)
+```
+
+`assert_memory_accumulates.py` runs the writer twice in an isolated `memacc_<uuid>` collection and
+asserts: each run grows the `source:"agent_run"` count; a `search()` recalls *this* run's
+`decision_id`; run 2 *also* recalls run 1's decision (accumulation, not overwrite); and the recalled
+text is **not a substring of any `tickets/*.md`** (the "accumulated via the write path, not
+re-seeded from the snapshots" proof). `diagnose_hermes_mem0_write.py` is a diagnostic, not a gate —
+it runs one loop with the deterministic helper disabled and reports whether the closed-source binary
+writes `memories` on its own (the deterministic helper stays load-bearing regardless).
+
+> mem0 OSS ≥ v2.0.0's hybrid lexical index uses spaCy lemmas via the `mem0ai[nlp]` extra (see the
+> Phase-1 mem0 note above); the writer warms the lemma model so the `Failed to load spaCy lemma
+> model` warning is cleared.
 
 ## Closeout — the comprehensive showcase montage (hybrid montage, design Q6)
 

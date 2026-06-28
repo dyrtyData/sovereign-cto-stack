@@ -61,9 +61,20 @@ and is verifiable before the next begins.
 - **Closeout** — hybrid-montage **showcase video** (`assert_showcase_video.py`) + the next
   full-build epic (**GLO-14**) authored and snapshotted.
 
-The next epic (**GLO-14**) rolls forward: passive long-lived mem0 capture, an autonomous
-PR→Hermes→Greptile review loop, a real-Linear-UI demo ending, host-orchestrator MicroVM
-confinement, real shipped-bet feedback, and a Moderne paid-tier evaluation.
+**GLO-14 (in progress — the system learns and reviews):**
+
+- **P1** — mem0 OSS pinned to **`mem0ai[nlp]>=2.0.0`** (native entity-linking, no Neo4j; spaCy
+  lemmatized lexical index), gated by the extended round-trip — `mem0_roundtrip.py`.
+- **P2** — **Close the mem0 write path:** both agent loops now record the just-filed decision into
+  the unified **`memories`** collection (`mem0_record_decision.py`, `infer=True`) at the canonical
+  "after `save_issue`, before snapshot" position, so memory genuinely **accumulates run-over-run**;
+  the PMF consult reads the same collection. Gated by `assert_memory_accumulates.py` (two runs grow
+  the count, run 2 recalls run 1, and the recall is **not** re-seeded from `tickets/`); the
+  non-gating `diagnose_hermes_mem0_write.py` probes whether the Hermes binary writes mem0 natively.
+
+The rest of **GLO-14** rolls forward: a ticket-instruction Greptile review loop, a real-Linear-UI
+demo ending + read-only memory view, host-orchestrator MicroVM confinement, real shipped-bet
+feedback, and a Moderne paid-tier evaluation.
 
 ## Quick start
 

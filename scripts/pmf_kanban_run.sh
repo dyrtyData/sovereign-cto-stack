@@ -361,10 +361,80 @@ log "completing task $TASK_ID with structured handoff (-> done)"
   --result "$SUMMARY" \
   --metadata "$METADATA" >/dev/null
 
+# --- 4b. CLOSE THE mem0 WRITE PATH (GLO-14 P1) -------------------------------
+# The load-bearing GLO-14 slice, same canonical position as the hero loop: AFTER
+# the ledger/Kanban-complete write returns and BEFORE snapshot_after_run.sh. We
+# record THIS PMF run's decision (the rank-1 opportunity + its grounding) into the
+# unified `memories` collection via scripts/mem0_record_decision.py (infer=True), so
+# the collection genuinely accumulates run-over-run and the PMF consult — now
+# repointed to read `memories` — recalls real prior decisions. Best-effort: git stays
+# authoritative (snapshot below). Disable for the Q3 probe via MEM0_RECORD_DECISION_DISABLE=1.
+record_pmf_decision_to_mem0() {
+  [ "${MEM0_RECORD_DECISION_DISABLE:-0}" = "1" ] && { log "mem0 record-decision DISABLED (probe mode) — skipping the deterministic write"; return 0; }
+  command -v uv >/dev/null 2>&1 || { log "uv not found — cannot record PMF decision to mem0"; return 0; }
+  docker compose up -d mem0-postgres >/dev/null 2>&1 || true
+  # The decision id keys to the rank-1 opportunity. In NO_AGENT mode no [Product]
+  # ticket is filed, so we key the memory to the ledger's top opportunity + this run's
+  # timestamp; in a live run we prefer the just-filed [Product] ticket snapshot.
+  local meta
+  meta="$(LEDGER="$LEDGER" TS="$TS" python3 - <<'PY' 2>/dev/null || true
+import json, os, re
+from pathlib import Path
+root = Path.cwd(); ledger = Path(os.environ["LEDGER"]); ts = os.environ.get("TS", "")
+# Prefer a freshly-filed [Product] ticket snapshot (live run); else the ledger top.
+tdir = root / "tickets"
+chosen = None
+for p in sorted(tdir.glob("GLO-*.md"), key=lambda q: q.stat().st_mtime, reverse=True):
+    head = p.read_text(errors="ignore")[:500]
+    m = re.search(r"^#\s+(.*)$", head, re.M)
+    title = m.group(1) if m else ""
+    if "[Product]" in title:
+        text = p.read_text(errors="ignore")
+        gi = sorted(set(re.findall(r"Grounded in:[^\n]*?([A-Za-z0-9_\-]+\.md)", text, re.I)))
+        body = " ".join(re.sub(r"^#.*$", "", text, flags=re.M).split())[:600]
+        chosen = {"ticket_id": p.stem, "title": title, "grounded_in": gi, "summary": body}
+        break
+if chosen is None and ledger.is_file():
+    L = json.loads(ledger.read_text())
+    opps = L.get("opportunities") or []
+    if opps:
+        top = opps[0]
+        chosen = {
+            "ticket_id": f"PMF-{ts}",
+            "title": top.get("title", "PMF opportunity"),
+            "grounded_in": [g for g in (top.get("grounded_in") or []) if str(g).endswith(".md")],
+            "summary": (f"Rank-1 RICE {top.get('rice_score')} opportunity: {top.get('title','')}. "
+                        f"Feasibility: {top.get('graphify_feasibility','')}."),
+        }
+if chosen:
+    print(json.dumps(chosen))
+PY
+)"
+  [ -n "$meta" ] || { log "no PMF decision to record (no ledger/ticket) — skipping mem0 write"; return 0; }
+  local ticket_id title grounded_summary
+  ticket_id="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["ticket_id"])' 2>/dev/null || true)"
+  title="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["title"])' 2>/dev/null || true)"
+  grounded_summary="$(printf '%s' "$meta" | python3 -c 'import sys,json;print(json.load(sys.stdin)["summary"])' 2>/dev/null || true)"
+  [ -n "$ticket_id" ] || { log "could not resolve a PMF decision id for the mem0 write (skipping)"; return 0; }
+  local args=(--profile cto-market --run-id "pmf_run_${TS}" --ticket-id "$ticket_id"
+              --kind product_decision --grounding-question "$QUESTION"
+              --ticket-title "$title" --grounded-summary "${grounded_summary:-$title}")
+  while IFS= read -r g; do [ -n "$g" ] && args+=(--grounded-in "$g"); done < <(printf '%s' "$meta" | python3 -c 'import sys,json
+[print(x) for x in json.load(sys.stdin).get("grounded_in",[])]' 2>/dev/null || true)
+  log "recording the PMF decision ($ticket_id) into mem0 'memories' (infer=True; the GLO-14 write path)"
+  uv run "$REPO_ROOT/scripts/mem0_record_decision.py" "${args[@]}" \
+    && log "mem0 PMF decision recorded ($ticket_id) — memories will accumulate this run" \
+    || log "mem0 PMF decision write failed (non-fatal — git/ledger remain authoritative)"
+}
+
+record_pmf_decision_to_mem0
+
 # --- 5. persist any [Product] ticket the live run filed into git (Phase-5 wiring) ---
 # A live PMF run files a [Product] ticket; git history is the authoritative decision
 # record, so refresh the tracked tickets/<ID>.md snapshots. Non-fatal (NO_AGENT writes a
-# stub brief and files no ticket, so there is nothing to snapshot in that mode).
+# stub brief and files no ticket, so there is nothing to snapshot in that mode). NOTE:
+# the mem0 write (4b) deliberately precedes this snapshot — the canonical "after the
+# decision write, before snapshot" position research pins for decision capture.
 if [ "${NO_AGENT:-0}" != "1" ]; then
   log "snapshotting filed [Product] ticket(s) into git (tickets/)"
   bash "$REPO_ROOT/scripts/snapshot_after_run.sh" 2>/dev/null || \
