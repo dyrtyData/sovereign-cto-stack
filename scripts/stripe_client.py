@@ -249,7 +249,10 @@ def load_metrics(path: Path | str = OUT_PATH) -> dict:
     """
     p = Path(path)
     if not p.is_file():
-        raise SystemExit(
+        # FileNotFoundError (not SystemExit) so library callers — e.g. the GLO-14 P5
+        # joiner — can catch it with `except Exception`; SystemExit would tear down the
+        # process past a normal handler. CLI callers still surface the same message.
+        raise FileNotFoundError(
             f"FAIL: {p} not found — run `python3 scripts/stripe_client.py` first to "
             "compute real test-mode MRR/churn from the live Stripe API."
         )

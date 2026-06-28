@@ -280,14 +280,35 @@ case "$cmd" in
   # Chromium (full screen, persistent profile) at the given URL, then bridges :99 over
   # VNC (5900) so a human can SEE and CLICK to log in. The Linux Chromium writes the
   # session cookie into /recorder-profile itself — so the recording reuses it natively
-  # (a macOS-host Chrome profile would NOT decrypt under Linux Chromium). One-shot only:
-  #   docker compose run --rm -p 5900:5900 -e CHROMIUM_USER_DATA_DIR=/recorder-profile \
-  #       recorder login
+  # (a macOS-host Chrome profile would NOT decrypt under Linux Chromium). One-shot only.
+  #
+  # SECURITY (GLO-14 P3 — Greptile review): during this login window a LIVE Linear OAuth
+  # session is being written to the profile, so the VNC bridge MUST NOT be exposed to the
+  # LAN. Two guards, both required:
+  #   1. A VNC_PASSWORD is MANDATORY (no password-less default). To run a no-auth session
+  #      anyway (e.g. an isolated host) you must OPT IN explicitly with VNC_ALLOW_NOPW=1.
+  #   2. Bind the published port to the host LOOPBACK only — `-p 127.0.0.1:5900:5900` —
+  #      so only this machine can reach it. (x11vnc itself listens on 0.0.0.0 INSIDE the
+  #      container because Docker's port-forwarder cannot reach a container-loopback bind;
+  #      the host-side 127.0.0.1 mapping is what actually confines exposure.)
+  #   VNC_PASSWORD=$(openssl rand -base64 12) \
+  #   docker compose run --rm -p 127.0.0.1:5900:5900 \
+  #       -e VNC_PASSWORD -e CHROMIUM_USER_DATA_DIR=/recorder-profile recorder login
   # then connect a VNC viewer to localhost:5900 (macOS: Finder → Go → Connect to
   # Server → vnc://localhost:5900), log into Linear, and Ctrl-C when done.
   login)
     if [ -z "${CHROMIUM_USER_DATA_DIR:-}" ]; then
       echo "login: refusing — set CHROMIUM_USER_DATA_DIR (e.g. /recorder-profile) so the session persists" >&2
+      exit 2
+    fi
+    # Mandatory VNC auth: a live Linear session is exposed over :5900 during login, so we
+    # refuse the password-less path unless the operator explicitly opts in (VNC_ALLOW_NOPW=1)
+    # AND, even then, only confine exposure via the documented host-loopback port mapping.
+    if [ -z "${VNC_PASSWORD:-}" ] && [ "${VNC_ALLOW_NOPW:-}" != "1" ]; then
+      echo "login: refusing — set VNC_PASSWORD (e.g. VNC_PASSWORD=\$(openssl rand -base64 12)) so the" >&2
+      echo "       VNC bridge is authenticated; a LIVE Linear session is exposed on :5900 during login." >&2
+      echo "       Also publish loopback-only: docker compose run --rm -p 127.0.0.1:5900:5900 ... recorder login" >&2
+      echo "       (To run no-auth on an isolated host anyway, set VNC_ALLOW_NOPW=1 — not recommended.)" >&2
       exit 2
     fi
     start_xvfb
@@ -298,13 +319,13 @@ case "$cmd" in
     rm -f "$CHROMIUM_USER_DATA_DIR"/Singleton* 2>/dev/null || true
     launch_browser "${1:-https://linear.app}" full
     log "login: Chromium up on $DISPLAY_NUM with persistent profile $CHROMIUM_USER_DATA_DIR"
-    # macOS Screen Sharing refuses password-less VNC, so honor VNC_PASSWORD when set
-    # (one-time throwaway, never persisted). Falls back to -nopw for clients that allow it.
+    # x11vnc binds 0.0.0.0 INSIDE the container (Docker's forwarder can't reach a
+    # container-loopback bind); confine real exposure with `-p 127.0.0.1:5900:5900`.
     if [ -n "${VNC_PASSWORD:-}" ]; then
-      log "login: starting x11vnc on :5900 (password auth) — connect your VNC viewer and log into Linear, then Ctrl-C"
+      log "login: starting x11vnc on :5900 (password auth) — publish loopback-only (-p 127.0.0.1:5900:5900), connect your VNC viewer, log into Linear, then Ctrl-C"
       exec x11vnc -display "$DISPLAY_NUM" -forever -shared -passwd "$VNC_PASSWORD" -rfbport 5900 -listen 0.0.0.0 -quiet
     fi
-    log "login: starting x11vnc on :5900 (no auth) — connect your VNC viewer, log into Linear, then Ctrl-C"
+    log "login: WARNING starting x11vnc on :5900 with NO AUTH (VNC_ALLOW_NOPW=1) — ensure -p 127.0.0.1:5900:5900 so it is loopback-only; log into Linear, then Ctrl-C"
     exec x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -rfbport 5900 -listen 0.0.0.0 -quiet
     ;;
   snapshot)        start_xvfb; snapshot "${1:-/recordings/frame.png}" ;;

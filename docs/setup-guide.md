@@ -866,13 +866,17 @@ display over VNC so you can see and click:
 
 ```bash
 # 1. one-time interactive login (VNC into the recorder's Chromium, sign in to Linear):
-docker compose run --rm -p 5901:5900 \
-  -e CHROMIUM_USER_DATA_DIR=/recorder-profile -e VNC_PASSWORD=sovereign \
+#    SECURITY: a LIVE Linear session is exposed over VNC during login, so VNC_PASSWORD is
+#    MANDATORY (the verb refuses without it) and the port is published LOOPBACK-ONLY
+#    (127.0.0.1) so only this machine can connect. Use a throwaway password.
+docker compose run --rm -p 127.0.0.1:5901:5900 \
+  -e CHROMIUM_USER_DATA_DIR=/recorder-profile -e VNC_PASSWORD="$(openssl rand -base64 12)" \
   recorder login
 #    then connect a VNC viewer to localhost:5901 (macOS: Finder -> Go -> Connect to Server ->
-#    vnc://localhost:5901, password 'sovereign'), log into Linear in the window, then Ctrl-C.
+#    vnc://localhost:5901, using the printed password), log into Linear in the window, then Ctrl-C.
 #    (Host port 5900 is often taken by macOS Screen Sharing — map 5901->5900 as above. The
-#    VNC_PASSWORD is a throwaway for that one VNC session; only your Linear cookie persists.)
+#    VNC_PASSWORD is a throwaway for that one VNC session; only your Linear cookie persists.
+#    127.0.0.1: confines the bridge to host loopback — never expose it to the LAN.)
 # 2. record with the live ending enabled (the same profile is bind-mounted into the recorder):
 TICKET_LIVE_URL=1 bash scripts/record_run.sh hero
 ```

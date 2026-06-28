@@ -760,6 +760,18 @@ exit-0 contract on the load-bearing mechanism while honestly scoping the two gen
 > visualize the real component topology (the coupling graph, the memory layer, the Kanban lifecycle)
 > so the architecture is legible, not asserted._
 
+**Decision (Greptile review follow-up): the `login` VNC bridge requires auth + loopback-only
+publishing — no password-less default.** A Greptile PR review (the same standing review this epic
+adds in P2) flagged that the one-shot `login` verb started `x11vnc` with `-nopw` by default while the
+documented `docker compose run` published `5900` on all interfaces — during the login window a **live
+Linear OAuth session** is being written to the profile, so any LAN host could connect and drive it.
+Hardened: `recorder/entrypoint.sh` now **refuses** the password-less path unless the operator
+explicitly opts in with `VNC_ALLOW_NOPW=1`, and both the verb's log line and `docs/setup-guide.md`
+publish the port **loopback-only** (`-p 127.0.0.1:5901:5900`) with a throwaway `VNC_PASSWORD`. (x11vnc
+still binds `0.0.0.0` *inside* the container because Docker's port-forwarder cannot reach a
+container-loopback bind; the host-side `127.0.0.1` mapping is what actually confines exposure.)
+This is the review loop working as designed — a finding caught, grounded, and fixed in the same PR.
+
 ### GLO-14 P4 — Host-orchestrator MicroVM confinement spike (spiked + documented; design Q9 Option A)
 
 **The gap this addresses.** The GLO-13 P1 egress slice confines the *containerized* sub-tools
