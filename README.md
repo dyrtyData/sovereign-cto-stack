@@ -61,7 +61,7 @@ and is verifiable before the next begins.
 - **Closeout** — hybrid-montage **showcase video** (`assert_showcase_video.py`) + the next
   full-build epic (**GLO-14**) authored and snapshotted.
 
-**GLO-14 (in progress — the system learns and reviews):**
+**GLO-14 (the system learns and reviews — P1–P5 shipped, closed out):**
 
 - **P1** — mem0 OSS pinned to **`mem0ai[nlp]>=2.0.0`** (native entity-linking, no Neo4j; spaCy
   lemmatized lexical index), gated by the extended round-trip — `mem0_roundtrip.py`.
@@ -112,7 +112,21 @@ and is verifiable before the next begins.
   Hypervisor.framework); the **go/no-go is NO-GO** for a default build this epic — the fragile remainder
   (gateway reconfigure + guest bootstrap + virtio-fs sharing) is deferred. Acceptance #4 = "scoped".
 
-The rest of **GLO-14** rolls forward: a Moderne paid-tier evaluation and the remaining Part C deferrals.
+- **Closeout (Phase 7 — Part C / D, design D-6 / Q11 / Q12).** The D-6 boundary is gated by
+  `scripts/assert_closeout_ready.py`: it runs **every** prior-phase gate (`assert_memory_accumulates`,
+  `assert_greptile_instruction`, `assert_shipped_flip`, `assert_showcase_video`, `assert_microvm_spike`)
+  and requires all exit-0, **and** asserts the GLO-14 acceptance checklist in `tickets/GLO-14.md` is
+  fully ticked — so "substantially actioned" is measured, not asserted by feel. The **Part C deferrals**
+  are captured with scope + rationale in `docs/system-design-tradeoffs.md`: **Moderne/OpenRewrite**
+  (Q11 — no account, so deferred; a **commented `moderne` stub** is staged in `hermes/config.yaml`,
+  not registered; the OpenRewrite-OSS pilot is preserved as the no-account option; remediation stays
+  Codegen "named-only"), the **mem0 OSS server + Next.js dashboard** (Q12), **OpenHands via
+  Portal/LiteLLM**, the **second-account walkthrough**, and the **mem0 passive-capture-via-proxy**
+  option. Then the **next full-build epic** is authored (`scripts/file_fullbuild_ticket.py
+  --closeout-epic`, Linear assigns the id after GLO-19) rolling those forward plus the GLO-14
+  discoveries (the Greptile global out-of-repo prerequisite, the live-profile skill-deploy step, the
+  duplicate-finding dedupe need) and snapshotted to `tickets/` (rule 7); `assert_fullbuild_ticket.py
+  --next-epic` asserts the rolled-forward items + the snapshot.
 
 ## Quick start
 
@@ -171,6 +185,8 @@ Complete every item before running later phases.
 │   ├── render_memory_card.py                     # read-only mem0 `memories` view (file:// HTML, marked.js)
 │   ├── assert_memory_view_grows.py / assert_persistent_profile_wiring.py  # GLO-14 P3 demo gates
 │   ├── microvm_spike.sh / assert_microvm_spike.py  # GLO-14 P4 host-MicroVM confinement spike + tolerant gate
+│   ├── file_fullbuild_ticket.py / assert_fullbuild_ticket.py  # author + verify the [Full-Build] epic (--closeout-epic / --next-epic)
+│   ├── assert_closeout_ready.py                     # GLO-14 P7 D-6 boundary: all prior gates exit-0 + GLO-14 checklist ticked
 │   └── file_fullbuild_ticket.py / snapshot_tickets.py  # author + snapshot the full-build epic
 ├── docs/
 │   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)

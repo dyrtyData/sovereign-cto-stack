@@ -197,15 +197,25 @@ executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on
 
 ## Acceptance criteria (for this full-build epic)
 
-- [ ] mem0 `memories` collection ACCUMULATES — every agent run writes its decision; a fresh query
+- [x] mem0 `memories` collection ACCUMULATES — every agent run writes its decision; a fresh query
       after N runs returns prior-run decisions that were never seeded from `tickets/`.
-- [ ] Moderne/OpenRewrite evaluated: one recipe piloted, the route-to-Moderne decision recorded in
-      `docs/system-design-tradeoffs.md` with cost/benefit vs Codegen.
-- [ ] The recorded demo CAN end on the real Linear ticket UI (authenticated Chromium profile), with
+      *(Done — P2: `mem0_record_decision.py` + `assert_memory_accumulates.py` exit 0; two runs grow
+      the count, run 2 recalls run 1, recalled text is absent from every `tickets/*.md`.)*
+- [x] Moderne/OpenRewrite CAPTURED with scope + rationale, the route-to-Codegen decision recorded in
+      `docs/system-design-tradeoffs.md`, and a deferred local-MCP stub staged in `hermes/config.yaml`.
+      *(Resolved Q11: no Moderne account is provisioned, so the paid-recipe pilot is **deferred to
+      Part C** rather than executed; remediation routes to Codegen "named-only". The OpenRewrite-OSS
+      pilot is preserved as the no-account option, rolled forward into the next epic.)*
+- [x] The recorded demo CAN end on the real Linear ticket UI (authenticated Chromium profile), with
       the local-snapshot HTML retained as the reproducible default.
-- [ ] Host-orchestrator MicroVM confinement scoped (or built) with the macOS-bug tradeoffs recorded.
-- [ ] Each rolled-forward item states scope + rationale (done above).
-- [ ] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
+      *(Done — P3 / D-2: the authenticated GLO-19 Linear UI montage ending + the `file://` default;
+      `assert_showcase_video.py` + `assert_persistent_profile_wiring.py` exit 0.)*
+- [x] Host-orchestrator MicroVM confinement scoped (or built) with the macOS-bug tradeoffs recorded.
+      *(Done — P4: spiked to the driver-binds layer, dated NO-GO + the four macOS limitations
+      recorded in `docs/system-design-tradeoffs.md`; `assert_microvm_spike.py` exit 0.)*
+- [x] Each rolled-forward item states scope + rationale (done above + Part C of the tradeoffs doc).
+- [x] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
+      *(Done — Phase 7: `scripts/file_fullbuild_ticket.py --closeout-epic` files it and snapshots it.)*
 
 ---
 

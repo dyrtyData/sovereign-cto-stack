@@ -910,6 +910,50 @@ The **memory-view** segment works the same way: render the card
 live surfaces** — the hero loop, the mem0 memory view, and the authenticated Linear ending — with
 the remaining lower-signal components as informational title cards by design (D-2).
 
+## GLO-14 Phase 7 — closeout: Part C deferral capture + author the next epic (design D-6 / Q11 / Q12)
+
+The D-6 closeout boundary: GLO-14's full-epic scope (P1–P5 + the Part C capture) is **substantially
+actioned and gated**, so the final step authors the *next* full-build epic and snapshots it to git
+(AGENTS.md rule 7). The boundary itself is a scripted contract, not a feel call:
+
+```bash
+docker compose up -d mem0-postgres                       # the gates that need it expect it up
+# the D-6 boundary gate: runs EVERY prior-phase gate (must all exit 0) AND asserts the GLO-14
+# acceptance checklist in tickets/GLO-14.md is fully ticked:
+uv run scripts/assert_closeout_ready.py                  # PASS only when the epic is genuinely closed out
+```
+
+`scripts/assert_closeout_ready.py` launches each prior gate via `uv run` (so its inline deps resolve)
+— `assert_memory_accumulates` (P2), `assert_greptile_instruction` (P3), `assert_shipped_flip` (P5),
+`assert_showcase_video` (P3/D-2), `assert_microvm_spike` (P4) — and requires all exit-0, then parses
+the `## Acceptance criteria` checklist in `tickets/GLO-14.md` and requires every box ticked. It runs
+the gates **for real** by default (services are expected up); a gate that legitimately cannot run
+because a service is down is reported `SKIP` (not a false FAIL) unless `CLOSEOUT_STRICT=1`.
+
+**The deferred Moderne stub (Q11).** Remediation routing stays **Codegen "named-only"**; no Moderne
+account is provisioned, so `hermes/config.yaml` carries a **commented `moderne` `mcp_servers` stub**
+(documenting `mod config agent-tools install`) — deferred, *not* registered. The OpenRewrite-OSS
+pilot is preserved as the no-account path. `docker compose config -q` still parses cleanly (the stub
+is a YAML comment, and nothing in `docker-compose.yml` changed).
+
+**Author + snapshot the next epic (Part D recurrence).** The next full-build epic rolls forward the
+Part C deferrals (Moderne/OpenRewrite, the mem0 OSS server + Next.js dashboard, OpenHands via
+Portal/LiteLLM, the second-account walkthrough, the mem0 passive-capture-via-proxy option) plus the
+items discovered building P1–P5 (the Greptile global out-of-repo prerequisite, the live-profile
+skill-deploy step, the duplicate-finding dedupe need). Linear assigns its id (the next free GLO-NN,
+after GLO-19):
+
+```bash
+# author/update the next epic (creates ONE real [Full-Build] ticket; idempotent on re-run):
+python3 scripts/file_fullbuild_ticket.py --closeout-epic         # -> files it + snapshots tickets/<ID>.md
+# verify it rolls forward Moderne + the mem0 dashboard + OpenHands and that the snapshot exists:
+uv run scripts/assert_fullbuild_ticket.py --next-epic            # discovers the closeout epic by title
+```
+
+Git history — `docs/system-design-tradeoffs.md` (the "GLO-14 closeout (Phase 7)" section) + the
+`tickets/<ID>.md` snapshot — is the authoritative, always-current roadmap; the Linear ticket is the
+convenience surface.
+
 > **What is automated vs. human here.** The default `file://` path and the persistent-profile
 > **wiring** are both gated: `assert_persistent_profile_wiring.py` drives the real `launch_browser`
 > path with a throwaway `--user-data-dir` and asserts the recorder launched Chromium **with** the

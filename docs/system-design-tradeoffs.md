@@ -821,6 +821,64 @@ montage already tells the story without it; the captured spike log remains the e
 > investigation reproducible and evidence-driven (a scripted spike + a captured log + an exit-0 gate)
 > rather than an un-reproducible manual experiment._
 
+### GLO-14 closeout (Phase 7) — Part C deferral capture + the next epic (design D-6 / Q11 / Q12)
+
+The D-6 closeout boundary is reached: GLO-14's full-epic scope (P1–P5 + this Part C capture) is
+**substantially actioned and gated** — `scripts/assert_closeout_ready.py` measures it (every prior
+gate exit-0 + the GLO-14 acceptance checklist in `tickets/GLO-14.md` fully ticked), so "substantially
+actioned" is a scripted contract, not a feel call. With that proven, the next full-build epic is
+authored (`scripts/file_fullbuild_ticket.py --closeout-epic`) and snapshotted to `tickets/` (rule 7).
+The deferrals rolled forward into it, each with scope + rationale (acceptance #5):
+
+- **Moderne / OpenRewrite (Q11 — no account; OSS-pilot preserved as an option).** *Scope:* the
+  deterministic, recipe-based mass-refactor back-end alongside Codegen (recipe-amenable + Java debt
+  Codegen does not cover). *Why deferred:* no Moderne account is provisioned, so the paid-recipe
+  evaluation is **NOT** executed this epic; remediation continues to route to **Codegen
+  ("named-only")**. A **commented `moderne` stub is staged in `hermes/config.yaml mcp_servers`**
+  (documenting `mod config agent-tools install`) — deferred, *not* registered. The **OpenRewrite-OSS
+  pilot** is preserved as the no-account path: a future epic can pilot one recipe without a paid
+  account and record the route-to-Moderne-vs-Codegen decision here.
+- **mem0 OSS server + Next.js read-only dashboard (Q12 — deferred; promoted to a build item now).**
+  *Scope:* a small Next.js read-only view over the now-accumulating `memories` collection (entity
+  links, per-run decisions, search). *Why deferred:* GLO-14 built a *lightweight static* memory card
+  (`render_memory_card.py`) that verifies the phase, and no frontend scaffolding exists in the repo;
+  a full dashboard is a visualization nicety. *Why it's worth more now:* P1/P2 made `memories`
+  actually fill up, so a dashboard over a growing memory beats one over an empty one — it leads the
+  next epic's backlog.
+- **OpenHands via Portal/LiteLLM.** *Scope:* autonomous greenfield prototyping pointed at the Nous
+  Portal OpenAI-compatible endpoint via LiteLLM (`LLM_MODEL`/`LLM_API_KEY`/`LLM_BASE_URL`). *Why
+  deferred:* the greenfield path stays "Hermes research → HumanLayer ticket → Claude Code executes";
+  Claude Code Max OAuth tokens are blocked in third-party tools, so the LiteLLM-on-Portal route is
+  the chosen future enablement (avoids a separate Anthropic key).
+- **Second-account "fresh setup" walkthrough.** *Scope:* document a two-account topology. *Why
+  deferred:* the single-account / multiple-profiles topology is what makes the shared Kanban board
+  work (Hermes has no cross-account coordination primitive); two-account is future-only.
+- **mem0 passive capture via the OpenAI-compatible proxy (Q3 follow-on).** *Scope / enablement path
+  + the load-bearing rejection rationale are recorded in full in the GLO-14 P2 section above* — kept
+  in the rolled-forward set so a future epic can adopt it deliberately. *Why still deferred:* it
+  places mem0 in the critical inference hot path and captures noisy raw turns, violating the
+  "complement, never load-bearing" rule; the deterministic writer is the better fit.
+
+**Items discovered while building GLO-14 P1–P5 (folded into the next epic).** (1) The **Greptile
+global setup** is an **out-of-repo prerequisite** (CLI + Claude Code skill + `/greptile` command in
+`~/.claude`), not a repo deliverable — recorded so a fresh clone knows the dependency. (2) A
+**live-profile skill-deploy step**: the tracked `hermes/skills/*.md` (incl. the Greptile instruction
+line) must be synced into each live `~/.hermes` profile for the instruction to actually fire. (3) A
+**duplicate-finding dedupe** need: re-filing `[Brownfield]` tickets produced duplicates
+(GLO-8/9/10/11 → re-centered GLO-15/16), so a dedupe/consolidation step keeps the tracker and
+`tickets/` snapshots clean.
+
+**The next epic** (Part D recurrence) re-prioritizes these: mem0 dashboard (P1), Moderne/OpenRewrite
+(P2), the deeper in-repo Greptile-triage loop (P3), the MicroVM build remainder (P4 — GLO-14 P4's
+deferred remainder), then OpenHands + the second-account walkthrough (P6). It carries the
+`[Full-Build]` label and is snapshotted to `tickets/`; `scripts/assert_fullbuild_ticket.py
+--next-epic` asserts it rolls forward Moderne + the mem0 dashboard + OpenHands and that the snapshot
+exists.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — a self-perpetuating roadmap: close one epic by
+> authoring the next, rolling forward the remainder and what you learned building it; *Accelerate* —
+> make the closeout boundary itself a falsifiable, scripted gate rather than a judgment call._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

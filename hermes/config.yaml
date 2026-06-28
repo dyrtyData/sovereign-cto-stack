@@ -87,3 +87,15 @@ mcp_servers:
     auth: oauth                            # token at ~/.hermes/mcp-tokens/codegen.json;
                                            # CODEGEN_API_KEY in ~/.hermes/.env (never here)
     timeout: 120
+  # moderne (DEFERRED — NOT registered; GLO-14 Phase 7 / design Q11).
+  # Moderne/OpenRewrite is the recipe-amenable remediation alternative to Codegen, but no
+  # Moderne account is provisioned, so it stays a COMMENTED stub (not a live entry) — Codegen
+  # remains the named-only back-end. To enable it in a future epic, install the Moderne LOCAL
+  # MCP server, which registers it on stdio, then UNCOMMENT the block below:
+  #   mod config agent-tools install       # exposes trigrep_search, find_types, change_type,
+  #                                         # search_recipes, run_recipe, … on a local MCP server
+  # moderne:
+  #   command: "mod"                       # the Moderne CLI's local MCP server (stdio transport)
+  #   args: ["mcp"]                        # `mod config agent-tools install` writes the real args
+  #   # No url/auth: it is a LOCAL server (no egress). Pilot one recipe, then record the
+  #   # route-to-Moderne decision vs Codegen in docs/system-design-tradeoffs.md.
