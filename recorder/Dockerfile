@@ -31,8 +31,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # - xterm       : the LIVE agent-log pane (`tail -f` of the agent reasoning log)
 # - fonts-*     : legible text (the surface is mostly text/graph labels)
 # - x11-apps    : xmessage / xclock fallbacks if no browser surface is supplied
+# - x11vnc      : OPTIONAL one-time interactive bridge to :99 so a human can log into
+#                 Linear once and persist the session into the mounted --user-data-dir
+#                 (the authenticated live-Linear ending). Used only by the `login`
+#                 verb; never on the default capture path.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        xvfb ffmpeg x11-utils x11-apps wmctrl fluxbox chromium xterm \
+        xvfb ffmpeg x11-utils x11-apps wmctrl fluxbox chromium xterm x11vnc \
         fonts-dejavu fonts-liberation ca-certificates procps \
     && rm -rf /var/lib/apt/lists/*
 

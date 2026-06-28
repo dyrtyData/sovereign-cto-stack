@@ -818,12 +818,22 @@ through the real `mem0_record_decision` write path, renders again `--against` th
 row. It runs against a throwaway isolated collection (never pollutes the live `memories`).
 
 **Optional authenticated live-Linear ending.** The default ending stays the `file://` snapshot.
-To end instead on the **real** logged-in Linear ticket UI:
+To end instead on the **real** logged-in Linear ticket UI, you populate the gitignored persistent
+Chromium profile ONCE. The login MUST happen inside the recorder's own (Linux) Chromium — a
+macOS-host Chrome profile will **not** decrypt under Linux Chromium (cookies are encrypted with the
+macOS Keychain). So the recorder image ships a one-shot `login` verb that bridges its virtual
+display over VNC so you can see and click:
 
 ```bash
-# 1. populate the gitignored persistent Chromium profile ONCE (needs your click — log in to Linear):
-chromium --user-data-dir="$PWD/recorder-profile"          # then sign in to Linear in that window, quit
-# 2. record with the live ending enabled (a persistent profile is bind-mounted into the recorder):
+# 1. one-time interactive login (VNC into the recorder's Chromium, sign in to Linear):
+docker compose run --rm -p 5901:5900 \
+  -e CHROMIUM_USER_DATA_DIR=/recorder-profile -e VNC_PASSWORD=sovereign \
+  recorder login
+#    then connect a VNC viewer to localhost:5901 (macOS: Finder -> Go -> Connect to Server ->
+#    vnc://localhost:5901, password 'sovereign'), log into Linear in the window, then Ctrl-C.
+#    (Host port 5900 is often taken by macOS Screen Sharing — map 5901->5900 as above. The
+#    VNC_PASSWORD is a throwaway for that one VNC session; only your Linear cookie persists.)
+# 2. record with the live ending enabled (the same profile is bind-mounted into the recorder):
 TICKET_LIVE_URL=1 bash scripts/record_run.sh hero
 ```
 
@@ -831,7 +841,9 @@ TICKET_LIVE_URL=1 bash scripts/record_run.sh hero
 a live session, **never committed**, AGENTS.md rule 3/8); `record_run.sh`'s `TICKET_LIVE_URL=1`
 block resolves the filed ticket URL and launches the right-pane browser **with**
 `--user-data-dir=/recorder-profile` so the session carries into the capture. Without a populated
-profile Chromium still hits the auth wall, so the snapshot ending remains the safe default.
+profile Chromium still hits the auth wall, so the snapshot ending remains the safe default. The
+`login` verb clears any stale Chromium `Singleton*` lock before launching (a leftover lock from a
+prior container otherwise makes Chromium exit instantly → a black VNC screen).
 
 > **What is automated vs. human here.** The default `file://` path and the persistent-profile
 > **wiring** are both gated: `assert_persistent_profile_wiring.py` drives the real `launch_browser`

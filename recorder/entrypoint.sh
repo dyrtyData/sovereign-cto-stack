@@ -275,10 +275,42 @@ case "$cmd" in
   surface-logterm) start_xvfb; launch_log_terminal "$1" "${2:-agent}" ;;
   start)           start_xvfb; start_capture "${1:-}" ;;
   stop)            stop_capture ;;
+  # GLO-14 P3: OPTIONAL one-time interactive login to persist a real Linear session
+  # into the mounted --user-data-dir (the authenticated live-Linear ending). Launches
+  # Chromium (full screen, persistent profile) at the given URL, then bridges :99 over
+  # VNC (5900) so a human can SEE and CLICK to log in. The Linux Chromium writes the
+  # session cookie into /recorder-profile itself — so the recording reuses it natively
+  # (a macOS-host Chrome profile would NOT decrypt under Linux Chromium). One-shot only:
+  #   docker compose run --rm -p 5900:5900 -e CHROMIUM_USER_DATA_DIR=/recorder-profile \
+  #       recorder login
+  # then connect a VNC viewer to localhost:5900 (macOS: Finder → Go → Connect to
+  # Server → vnc://localhost:5900), log into Linear, and Ctrl-C when done.
+  login)
+    if [ -z "${CHROMIUM_USER_DATA_DIR:-}" ]; then
+      echo "login: refusing — set CHROMIUM_USER_DATA_DIR (e.g. /recorder-profile) so the session persists" >&2
+      exit 2
+    fi
+    start_xvfb
+    # A prior container that held this profile can leave a stale SingletonLock/Socket
+    # behind; the new Chromium then sees "profile in use" and exits instantly (black
+    # screen over VNC). Clear the stale singletons before launching (safe: nothing
+    # else uses this profile in the one-shot login container).
+    rm -f "$CHROMIUM_USER_DATA_DIR"/Singleton* 2>/dev/null || true
+    launch_browser "${1:-https://linear.app}" full
+    log "login: Chromium up on $DISPLAY_NUM with persistent profile $CHROMIUM_USER_DATA_DIR"
+    # macOS Screen Sharing refuses password-less VNC, so honor VNC_PASSWORD when set
+    # (one-time throwaway, never persisted). Falls back to -nopw for clients that allow it.
+    if [ -n "${VNC_PASSWORD:-}" ]; then
+      log "login: starting x11vnc on :5900 (password auth) — connect your VNC viewer and log into Linear, then Ctrl-C"
+      exec x11vnc -display "$DISPLAY_NUM" -forever -shared -passwd "$VNC_PASSWORD" -rfbport 5900 -listen 0.0.0.0 -quiet
+    fi
+    log "login: starting x11vnc on :5900 (no auth) — connect your VNC viewer, log into Linear, then Ctrl-C"
+    exec x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -rfbport 5900 -listen 0.0.0.0 -quiet
+    ;;
   snapshot)        start_xvfb; snapshot "${1:-/recordings/frame.png}" ;;
   has-window)
     start_xvfb
     if has_mapped_window; then echo yes; exit 0; else echo no; exit 1; fi
     ;;
-  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-memory FILE [where]|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
+  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-memory FILE [where]|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|login [URL]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
 esac
