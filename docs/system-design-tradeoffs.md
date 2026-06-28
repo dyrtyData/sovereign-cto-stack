@@ -468,6 +468,36 @@ is the stronger-but-fragile next step, rolled forward to GLO-14.
 > _Grounded in: *Accelerate* — reproducibility and determinism over hand-made artifacts; make the
 > working system observable without breaking the clean-clone invariant._
 
+### GLO-14 P1 — mem0 OSS pinned to >= v2.0.0 for native entity-linking (built; the foundation slice)
+
+**Decision (design D-1, Option A): upgrade and pin mem0 OSS to `>=2.0.0,<3.0.0`** (tested against
+`2.0.10`) and rely on its **built-in entity linking** rather than an external graph store. This is
+the de-risking foundation the rest of GLO-14's "system that learns" stands on (P2 closes the write
+path on top of it). The pin lives in the PEP 723 inline-dependency headers of
+`scripts/mem0_roundtrip.py` and `scripts/mem0_pmf_decisions.py`; `uv` resolves it per-run, so there
+is no project-wide lockfile to drift.
+
+**Why this is low-risk.** We never configured `graph_store`, so the "native entity-linking replaces
+external graph DBs" change is purely additive for us — there is **no Neo4j and no `graph_store` key
+to remove**, and `hermes/mem0.json` loads unchanged under v2.0.0. The two behavioural changes that
+v2.0.0 actually makes — (1) `add()`/`search()` always return a dict with a `results` list, and
+(2) entity IDs (`user_id`/`agent_id`/`run_id`) must be passed inside `search()`'s `filters` argument
+— were *already* how the repo's scripts call mem0 (the PMF consult and the round-trip both pass
+`filters={"user_id": …}` and unwrap `results`). So the bump is a pin, not a rewrite.
+
+**How the bump is gated.** `scripts/mem0_roundtrip.py` (the existing CI smoke) is extended beyond its
+`infer=False` persistence proof to assert the v2.0.0 contract via `_assert_v2_shape()` —
+`results[]` present, each row carries a stable `id`, search rows carry a numeric `score` — and to
+exercise `infer=True` + native entity-linking over two facts that share an entity
+(`checkoutservice`), asserting the linked entity is observable in recall. The entity-link pass
+**self-skips** (logs `SKIP`, still exit 0) when the local Ollama fact-extractor is unreachable, so
+CI never depends on a local LLM while a dev box with Ollama proves the link automatically. Option B
+(stay pinned, vector-only) was discarded — it forgoes the native-graph recall quality that makes
+"graph logic handled natively under the hood" real for this stack.
+
+> _Grounded in: *Accelerate* — pin and gate dependency changes so a working increment is always
+> reproducible; mem0 as a recall complement over the authoritative git history (never a dependency)._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the

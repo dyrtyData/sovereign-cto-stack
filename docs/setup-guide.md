@@ -79,11 +79,26 @@ local **Ollama** endpoint for fact extraction, so no external embedding/LLM key 
 Platform mode is the fallback: set `MEM0_API_KEY` and switch `hermes/mem0.json` `mode` to
 `platform` (design Q6).
 
-Prove persistence (add a fact → `search()` returns it with a score):
+mem0 OSS is **pinned to `mem0ai>=2.0.0,<3.0.0`** (GLO-14 P1, design D-1; tested against
+`2.0.10`). v2.0.0 standardised the SDK return shape (`add()`/`search()` always return a dict
+with a `results` list) and ships **native entity-linking** baked into `infer=True` fact
+extraction — so the "graph logic" is handled under the hood with **no external graph DB and no
+Neo4j**. We do not configure `graph_store`, so there is nothing to remove and `hermes/mem0.json`
+loads unchanged under v2.0.0. The pin lives in the PEP 723 inline-dependency headers of the
+`scripts/mem0_*.py` smoke scripts; `uv` resolves it per-run.
+
+Prove persistence (add a fact → `search()` returns it with a score), the v2.0.0 return-shape
+contract, and — when the local Ollama fact-extractor is reachable — the `infer=True` native
+entity-linking pass:
 
 ```bash
+docker compose up -d mem0-postgres    # the pgvector backend the round-trip persists into
 uv run scripts/mem0_roundtrip.py      # exit 0 on a successful round-trip
 ```
+
+The round-trip's entity-linking assertion **self-skips** (logs `SKIP`, still exits 0) when
+Ollama is absent, so CI never depends on a local LLM while a dev box with Ollama proves the
+link automatically.
 
 ### 5. Wire Telegram and start the gateway
 

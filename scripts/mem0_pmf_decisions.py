@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11,<3.14"
 # dependencies = [
-#   "mem0ai",
+#   "mem0ai>=2.0.0,<3.0.0",
 #   "sentence-transformers",
 #   "vecs",
 #   "psycopg2-binary",
