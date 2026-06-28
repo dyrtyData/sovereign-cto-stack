@@ -48,6 +48,11 @@ def check_file(path: Path) -> list[str]:
         target = m.group(1).strip()
         # Markdown allows `(url "title")`; drop any title part.
         target = target.split(" ", 1)[0]
+        # Markdown autolink syntax inside a link, e.g. `[t](<https://…>)`: the
+        # angle brackets are delimiters, not part of the path — strip them so the
+        # SKIP_PREFIXES check sees the real scheme.
+        if target.startswith("<") and target.endswith(">"):
+            target = target[1:-1]
         if not target or target.startswith(SKIP_PREFIXES):
             continue
         # Strip a trailing #anchor; we validate the file part only.

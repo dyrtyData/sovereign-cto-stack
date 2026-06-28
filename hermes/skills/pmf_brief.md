@@ -226,6 +226,7 @@ THIN: exactly **one** opportunity, **one** ticket, deterministic enough to verif
    |---|---|
    | `title` | **Must start with `[Product]`**, then the one-line opportunity, e.g. `[Product] PMF agent emits a brief but cannot rank opportunities by market size — add a TAM/SAM sizing step` |
    | `team` | `Global South Ai Safety` (or team id `132f84d7-56c2-40b8-b271-52f934307ff6`) |
+   | `project` | `sovereign-cto-stack` — **always set this** so the ticket lands in the project board, not loose in the backlog (`save_issue` resolves the name to id `d1335da7-fec7-4eee-95ef-d94dde85cde5`). |
    | `labels` | `["Product"]` — the `Product` label (already created in the workspace; `save_issue` resolves the name to its id). If for any reason the label cannot attach, KEEP the `[Product]` title prefix as the marker. |
    | `priority` | `2` (High) for a clear, demanded gap; `3` (Medium) otherwise. |
    | `description` | Markdown, the body shape below. Literal newlines, not escapes. |

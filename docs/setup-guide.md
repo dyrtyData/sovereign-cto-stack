@@ -1101,6 +1101,22 @@ git add tickets/ && git commit -m "snapshot filed Linear tickets"
 > `gitleaks protect --staged` is clean over them). Re-running the snapshot is idempotent — it
 > overwrites `tickets/<ID>.md` with the current Linear state.
 
+**Linear project association.** Every Hermes-filed ticket sets `project: sovereign-cto-stack`
+(`save_issue` resolves the name to id `d1335da7-fec7-4eee-95ef-d94dde85cde5`) so issues land in the
+project board, not loose in the backlog. This is wired in both the scripts (`scripts/linear_mcp.py`
+exposes `PROJECT`, overridable via `$LINEAR_PROJECT`; `file_fullbuild_ticket.py` passes it) and the
+filing skills (`hermes/skills/file_brownfield_ticket.md`, `pmf_brief.md`) — so remember to redeploy
+the updated skills into the live profiles (`~/.hermes/profiles/<profile>/skills/<skill>/SKILL.md`)
+for the change to take effect on agent/cron runs.
+
+**Task-artifact hard-copy (for repomix / gitingest).** After an epic is complete, copy that task's
+HumanLayer planning artifacts (`.humanlayer/tasks/<task>/*.md`) into **`docs/task-artifacts/<task>/`**
+— scrubbed of secrets and **not** gitignored — and commit. The live `.humanlayer/tasks/` dir is a
+symlink into a separate HumanLayer-managed repo (so it is invisible to this repo's git and to
+context-flatteners); the hard copy makes the full research → design → outline → ticket trail part of
+the public repo so `repomix`/`gitingest` (which skip gitignored paths) flatten it into context. This
+is a standing closeout step, captured in the full-build epic's acceptance checklist.
+
 ## Final public-readiness pass (before sharing the repo)
 
 ```bash

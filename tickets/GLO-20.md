@@ -3,10 +3,10 @@
 - **identifier:** GLO-20
 - **url:** https://linear.app/global-south-ai-safety/issue/GLO-20/full-build-sovereign-cto-stack-next-epic-glo-14-learnreviewfeedback
 - **team:** Global South Ai Safety
-- **status:** Backlog
+- **status:** Todo
 - **labels:** Full-Build
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-28T22:20:31+00:00
+- **snapshot captured:** 2026-06-28T22:57:55+00:00
 
 ## Description
 
@@ -185,6 +185,15 @@ executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on
       go/no-go is re-confirmed with updated evidence.
 - [ ] Each rolled-forward item states scope + rationale (done above), incl. the Greptile global
       prerequisite, the live-profile skill-deploy step, and the duplicate-finding dedupe need.
+- [ ] Every Hermes-filed ticket is associated with the `sovereign-cto-stack` **Linear project**
+      (not loose in the backlog) — `save_issue` sets `project` in both the scripts and the filing
+      skills.
+- [ ] **After everything is complete:** hard-copy this task's HumanLayer artifacts
+      (`.humanlayer/tasks/<task>/*.md` — research questions, research, design discussion, structure
+      outline, ticket) into `docs/task-artifacts/<task>/`, scrubbed of any secrets and **NOT**
+      gitignored, and commit (to `main` once merged). This makes them visible to repomix / gitingest
+      (which skip gitignored paths) so the whole decision trail flattens into context. Standing
+      recurrence for every epic in this repo.
 - [ ] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
 
 ---
