@@ -242,6 +242,11 @@ def catalogue() -> list[dict]:
         # backing artifact — they always render from their bullets.
         {
             "id": "memory-view", "kind": "title",
+            # Prefer a REAL captured clip of the read-only mem0 memory view
+            # (recordings/memory_view_*.mp4, screen-captured from render_memory_card.py's
+            # HTML); fall back to the title card below if none is present. skip_verify:
+            # the card is near-static, so verify_recording's non-static check would reject it.
+            "recording": "memory_view_*.mp4", "skip_verify": True,
             "card_fn": lambda: dict(
                 kicker="GLO-14 P1 — a system that LEARNS",
                 headline="mem0 memory view — it grows",
@@ -437,7 +442,8 @@ def main() -> int:
         # data segments already render their own labeled surface as the body)
         if "recording" in seg and not seg.get("_no_title"):
             tcard = WORK / f"_title_{len(clips):02d}_{sid}.mp4"
-            if card_clip(seg["card"], tcard, TITLE_SECONDS):
+            title_card = seg["card_fn"]() if "card_fn" in seg else seg["card"]
+            if card_clip(title_card, tcard, TITLE_SECONDS):
                 clips.append(tcard)
         clips.append(seg_clip)
         included.append({"id": sid, "kind": seg["kind"]})
