@@ -10,10 +10,12 @@ auto-load this file's intent — you must pass it).
 
 Before EVERY commit in this repo — including each phase of a multi-phase build:
 
-- [ ] **Rule 6 — Living docs every phase/commit.** Update **both** `docs/setup-guide.md`
-      (repeatable clean-clone setup) **and** `docs/system-design-tradeoffs.md` (cited
-      decision record) for the slice you just built. Both must stay reproducible from a
-      fresh clone. This is NOT deferred to a closeout phase.
+- [ ] **Rule 6 — Living docs every phase/commit.** Update the living docs for the slice you
+      just built: **`README.md`** (front-door overview), **`docs/setup-guide.md`** (repeatable
+      clean-clone setup), **`docs/system-design-tradeoffs.md`** (cited decision record), and
+      `docs/cto-functions.md` when the CTO-function↔corpus map changes. If you touched
+      `scripts/`, `docker-compose.yml`, `hermes/`, or `egress/`, the matching docs (incl.
+      `README.md`) change in the SAME commit — NOT deferred to a closeout phase.
 - [ ] **Rule 7 — Snapshot filed tickets.** Persist every `[Brownfield]`/`[Product]`/
       `[Full-Build]` Linear ticket to `tickets/<ID>.md` (via `scripts/snapshot_tickets.py`
       / `scripts/snapshot_after_run.sh`) and **commit it** — git history, not an external

@@ -20,3 +20,19 @@ if ! gitleaks protect --staged --no-banner; then
 fi
 
 echo "pre-commit: gitleaks clean."
+
+# --- AGENTS.md rule 6 — living-docs reminder (non-blocking) -------------------
+# If this commit changes code/config but stages no README.md or docs/ update, warn
+# (does NOT block). Living docs (README.md, docs/setup-guide.md,
+# docs/system-design-tradeoffs.md, docs/cto-functions.md) must stay current per slice.
+# Override intentionally with DOCS_OK=1 (e.g. a pure refactor that truly needs no doc).
+staged="$(git diff --cached --name-only)"
+if printf '%s\n' "$staged" | grep -qE '^(scripts/|hermes/|egress/|docker-compose\.yml)'; then
+  if ! printf '%s\n' "$staged" | grep -qE '^(README\.md|docs/)'; then
+    if [ "${DOCS_OK:-0}" != "1" ]; then
+      echo "pre-commit: WARNING — code/config changed but no README.md or docs/ update is staged" >&2
+      echo "            (AGENTS.md rule 6: living docs every phase/commit). Update the docs for" >&2
+      echo "            this slice, or set DOCS_OK=1 to bypass intentionally." >&2
+    fi
+  fi
+fi

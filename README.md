@@ -19,20 +19,51 @@ Anyone can `git clone` this repo and bring the stack up with `docker compose up`
 - **CTO RAG brain** — local Vector MCP over the converted Growth / System Design / Org Design
   textbook corpus; consulted before every CTO function, citing its grounding text(s).
 - **Tech-debt loop (hero)** — graphify maps Online Boutique -> the auditor reads the graph,
-  consults the RAG brain, and files a `[Brownfield]` Linear ticket precise enough for HumanLayer.
-- **Recording** — an external Xvfb + ffmpeg sidecar captures an autonomous run to `.mp4`.
+  fuses a real **SonarQube** code-quality scan (DETECT) with graphify coupling (KEEP), consults
+  the RAG brain (JUDGMENT), and files a `[Brownfield]` Linear ticket precise enough for HumanLayer,
+  naming a remediation back-end (Codegen / Moderne).
+- **PMF loop** — the `CTO-Market` profile ranks multiple opportunities by **RICE/ICE**, grounded
+  in the corpus + **real Stripe (test-mode) MRR/churn/cohort** data + a prior-decisions consult
+  (self-hosted mem0 + git history), with a shipped-bet feedback ledger.
+- **Deny-by-default egress (sovereign safety)** — sub-tools run inside a real **NVIDIA
+  OpenShell / NemoClaw** sandbox enforcing an allow-list `egress/policy.yaml`; a non-allow-listed
+  CONNECT is refused (the load-bearing negative test).
+- **Recording** — an external Xvfb + ffmpeg sidecar captures autonomous runs to `.mp4`, stitched
+  into a hybrid-montage showcase video.
 
 ## Build phases
 
 The build is **strictly sequential and gated** — each phase is a thin vertical slice that boots
 and is verifiable before the next begins.
 
-- **Phase 0** — Public-safe repo skeleton, prerequisites gate & docs scaffolding (this commit).
+**Original build (GLO-13 Part A — shipped):**
+
+- **Phase 0** — Public-safe repo skeleton, prerequisites gate & docs scaffolding.
 - **Phase 1** — Hermes orchestrator boots end-to-end (Portal + mem0 + Telegram).
 - **Phase 2** — CTO knowledge RAG brain (corpus -> Vector MCP -> `query_cto_knowledge`).
 - **Phase 3** — Tech-debt auditor loop (graphify -> grounded `[Brownfield]` Linear ticket).
 - **Phase 4** — PMF research profile + autonomous-run `.mp4` recording.
-- **Phase 5** — Documentation finalization + comprehensive "full-build" Linear ticket.
+- **Phase 5** — Documentation finalization + comprehensive "full-build" Linear ticket (GLO-13).
+
+**Prioritized backlog (GLO-13 Part B, P0–P4 + closeout — shipped):**
+
+- **P0** — Demo authenticity: the recorded run streams **real** `[live] tool … completed` events
+  (sourced from the Hermes session store), gated by `assert_demo_authenticity.py`.
+- **P1** — Deny-by-default egress via a real **NVIDIA OpenShell/NemoClaw** sandbox; the gate's
+  load-bearing assertion is a **negative test** (non-allow-listed CONNECT refused) —
+  `assert_egress_policy.py`.
+- **P2** — **Stripe**-grounded AARRR Revenue/Retention from real test-mode data —
+  `assert_stripe_grounding.py`.
+- **P3** — **SonarQube** DETECT fused with graphify coupling -> Hermes JUDGMENT -> Codegen/Moderne
+  remediation — `assert_sonar_fusion.py`.
+- **P4** — Full PMF loop: **RICE/ICE-ranked** opportunities + mem0/git prior-decisions consult +
+  shipped-bet feedback — `assert_pmf_ranked.py`.
+- **Closeout** — hybrid-montage **showcase video** (`assert_showcase_video.py`) + the next
+  full-build epic (**GLO-14**) authored and snapshotted.
+
+The next epic (**GLO-14**) rolls forward: passive long-lived mem0 capture, an autonomous
+PR→Hermes→Greptile review loop, a real-Linear-UI demo ending, host-orchestrator MicroVM
+confinement, real shipped-bet feedback, and a Moderne paid-tier evaluation.
 
 ## Quick start
 
@@ -72,15 +103,23 @@ Complete every item before running later phases.
 ```
 .
 ├── .env.example              # credential template (copy to .env)
-├── docker-compose.yml        # mem0-postgres / rag-sidecar / recorder (phased)
+├── AGENTS.md / CLAUDE.md     # agent conventions + Standing rules (single source of truth)
+├── docker-compose.yml        # mem0-postgres / rag-sidecar / recorder / sonarqube (profiled)
 ├── README.md                 # this file
+├── egress/                    # deny-by-default egress (OpenShell/NemoClaw) — policy.yaml + sandbox Dockerfile
 ├── scripts/
-│   └── preflight.sh          # halts if required .env keys are missing
+│   ├── preflight.sh          # halts if required .env keys are missing
+│   ├── assert_*.py           # per-slice exit-0-on-pass gates (egress / stripe / sonar / pmf / showcase / …)
+│   ├── stripe_client.py / stripe_seed.py        # real Stripe test-mode metrics
+│   ├── sonarqube_client.py / fuse_signals.py    # SonarQube DETECT + graphify fusion
+│   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket cards
+│   └── file_fullbuild_ticket.py / snapshot_tickets.py  # author + snapshot the full-build epic
 ├── docs/
 │   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)
-│   ├── system-design-tradeoffs.md  # textbook-cited decision record (Q1–Q8b + deferred work)
+│   ├── system-design-tradeoffs.md  # textbook-cited decision record (Q1–Q8b + per-phase findings + deferred work)
 │   └── cto-functions.md       # "teach me to think like a CTO" — functions + grounding texts
 ├── tickets/                   # git-tracked snapshots of every filed Linear ticket
+├── graphify-out/              # service-coupling graph + fused static_analysis (gitignored)
 └── corpus/                   # converted textbooks (gitignored — stays local)
 ```
 
