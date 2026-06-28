@@ -273,6 +273,12 @@ def catalogue() -> list[dict]:
         },
         {
             "id": "linear-ending", "kind": "title",
+            # Prefer a REAL captured clip of the authenticated Linear ticket UI
+            # (recordings/auth_ending_*.mp4, produced via the persistent profile);
+            # gracefully fall back to the title card below if none is present.
+            # skip_verify: a live ticket page is near-static, so the non-static
+            # heuristic in verify_recording.py would reject it — we trust the clip.
+            "recording": "auth_ending_*.mp4", "skip_verify": True,
             "card": dict(
                 kicker="GLO-14 P3 — the ending",
                 headline="Filed Linear ticket (authenticated)",
@@ -378,16 +384,22 @@ def main() -> int:
 
         if "recording" in seg:
             rec = _latest(seg["recording"])
-            if rec is None:
-                print(f"  skip  {sid:16s} — no recording matches {seg['recording']}")
-                continue
-            if not verify_recording(rec):
-                print(f"  skip  {sid:16s} — {rec.name} failed verify_recording.py")
-                continue
-            print(f"  keep  {sid:16s} — recording {rec.name}")
             seg_clip = WORK / f"_body_{len(clips):02d}_{sid}.mp4"
-            if not normalize_clip(rec, seg_clip):
-                print(f"  skip  {sid:16s} — normalize failed")
+            usable = rec is not None and (seg.get("skip_verify") or verify_recording(rec))
+            if usable and normalize_clip(rec, seg_clip):
+                print(f"  keep  {sid:16s} — recording {rec.name}")
+            elif "card" in seg or "card_fn" in seg:
+                # graceful fallback (design D-2 / user-blessed): no usable clip ->
+                # render the title card as the body so the chapter still appears.
+                why = "no clip matches" if rec is None else f"{rec.name} unusable"
+                print(f"  note  {sid:16s} — {why} {seg['recording']}; falling back to title card")
+                card = seg["card_fn"]() if "card_fn" in seg else dict(seg["card"])
+                if not data_clip(card, seg_clip, DATA_SECONDS):
+                    print(f"  skip  {sid:16s} — fallback title clip render failed")
+                    continue
+                seg["_no_title"] = True   # the body IS the card; don't prepend another
+            else:
+                print(f"  skip  {sid:16s} — no recording matches {seg['recording']}")
                 continue
         elif seg.get("kind") == "title":
             # GLO-14 D-2 title-carded segment: NO backing artifact required — it
@@ -423,7 +435,7 @@ def main() -> int:
 
         # title card before the segment body (recordings carry a static card;
         # data segments already render their own labeled surface as the body)
-        if "recording" in seg:
+        if "recording" in seg and not seg.get("_no_title"):
             tcard = WORK / f"_title_{len(clips):02d}_{sid}.mp4"
             if card_clip(seg["card"], tcard, TITLE_SECONDS):
                 clips.append(tcard)
