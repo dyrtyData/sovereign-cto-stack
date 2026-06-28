@@ -903,6 +903,13 @@ The clip is marked `skip_verify` because a live ticket page is near-static (the 
 in `verify_recording.py` would otherwise reject it). The montage `.mp4` lives in the gitignored
 `recordings/` — it is the submission artifact, regenerated on demand, not committed.
 
+The **memory-view** segment works the same way: render the card
+(`uv run scripts/render_memory_card.py` → `recordings/memory_*.html`), screen-capture it into
+`recordings/memory_view_*.mp4` (same `chromium --kiosk file://… + ffmpeg x11grab` recipe), and
+`build_showcase_video.py` prefers that clip (else the title card). Net, the montage renders **three
+live surfaces** — the hero loop, the mem0 memory view, and the authenticated Linear ending — with
+the remaining lower-signal components as informational title cards by design (D-2).
+
 > **What is automated vs. human here.** The default `file://` path and the persistent-profile
 > **wiring** are both gated: `assert_persistent_profile_wiring.py` drives the real `launch_browser`
 > path with a throwaway `--user-data-dir` and asserts the recorder launched Chromium **with** the
