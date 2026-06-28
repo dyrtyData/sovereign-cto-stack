@@ -240,6 +240,25 @@ def compute_metrics() -> dict:
     }
 
 
+def load_metrics(path: Path | str = OUT_PATH) -> dict:
+    """Read the already-computed recordings/stripe_metrics.json (no new Stripe call).
+
+    The GLO-14 P5 North Star joiner GROUNDS a shipped-result against real Stripe data
+    by reading the artifact this client wrote — it never re-hits the API or adds a new
+    Stripe surface. Raises loudly if the artifact is missing (run this client first).
+    """
+    p = Path(path)
+    if not p.is_file():
+        # FileNotFoundError (not SystemExit) so library callers — e.g. the GLO-14 P5
+        # joiner — can catch it with `except Exception`; SystemExit would tear down the
+        # process past a normal handler. CLI callers still surface the same message.
+        raise FileNotFoundError(
+            f"FAIL: {p} not found — run `python3 scripts/stripe_client.py` first to "
+            "compute real test-mode MRR/churn from the live Stripe API."
+        )
+    return json.loads(p.read_text())
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--print", dest="show", action="store_true",

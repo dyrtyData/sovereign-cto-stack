@@ -468,6 +468,429 @@ is the stronger-but-fragile next step, rolled forward to GLO-14.
 > _Grounded in: *Accelerate* — reproducibility and determinism over hand-made artifacts; make the
 > working system observable without breaking the clean-clone invariant._
 
+### GLO-14 P1 — mem0 OSS pinned to >= v2.0.0 for native entity-linking (built; the foundation slice)
+
+**Decision (design D-1, Option A): upgrade and pin mem0 OSS to `>=2.0.0,<3.0.0`** (tested against
+`2.0.10`) and rely on its **built-in entity linking** rather than an external graph store. This is
+the de-risking foundation the rest of GLO-14's "system that learns" stands on (P2 closes the write
+path on top of it). The pin lives in the PEP 723 inline-dependency headers of
+`scripts/mem0_roundtrip.py` and `scripts/mem0_pmf_decisions.py`; `uv` resolves it per-run, so there
+is no project-wide lockfile to drift.
+
+**Why this is low-risk.** We never configured `graph_store`, so the "native entity-linking replaces
+external graph DBs" change is purely additive for us — there is **no Neo4j and no `graph_store` key
+to remove**, and `hermes/mem0.json` loads unchanged under v2.0.0. The two behavioural changes that
+v2.0.0 actually makes — (1) `add()`/`search()` always return a dict with a `results` list, and
+(2) entity IDs (`user_id`/`agent_id`/`run_id`) must be passed inside `search()`'s `filters` argument
+— were *already* how the repo's scripts call mem0 (the PMF consult and the round-trip both pass
+`filters={"user_id": …}` and unwrap `results`). So the bump is a pin, not a rewrite.
+
+**How the bump is gated.** `scripts/mem0_roundtrip.py` (the existing CI smoke) is extended beyond its
+`infer=False` persistence proof to assert the v2.0.0 contract via `_assert_v2_shape()` —
+`results[]` present, each row carries a stable `id`, search rows carry a numeric `score` — and to
+exercise `infer=True` + native entity-linking over two facts that share an entity
+(`checkoutservice`), asserting the linked entity is observable in recall. The entity-link pass
+**self-skips** (logs `SKIP`, still exit 0) when the local Ollama fact-extractor is unreachable, so
+CI never depends on a local LLM while a dev box with Ollama proves the link automatically. Option B
+(stay pinned, vector-only) was discarded — it forgoes the native-graph recall quality that makes
+"graph logic handled natively under the hood" real for this stack.
+
+> _Grounded in: *Accelerate* — pin and gate dependency changes so a working increment is always
+> reproducible; mem0 as a recall complement over the authoritative git history (never a dependency)._
+
+### GLO-14 P2 — Close the mem0 write path: `memories` accumulates every run (built; the load-bearing slice)
+
+**Decision (design Q2/Q3/Q4): a deterministic Python writer closes the loop, into the unified
+`memories` collection, with `infer=True`.** GLO-13 left the system able to *read* prior decisions
+but never *write* new ones, so the `memories` collection never accumulated — the headline GLO-14
+gap (the user's explicit request). This slice inserts `scripts/mem0_record_decision.py` at the
+single canonical position research pins in **both** agent loops — AFTER `save_issue` returns a
+ticket id and BEFORE `snapshot_after_run.sh` (`scripts/record_run.sh` step 7b;
+`scripts/pmf_kanban_run.sh` step 4b) — writing the full agent turn (grounding question + filed
+decision) into `memories` so mem0 extracts/dedups/entity-links it natively.
+
+- **Q2 — unify on `memories`.** The PMF consult (`scripts/mem0_pmf_decisions.py`) now *reads* the
+  same `memories` collection (`user_id="sovereign-cto"`) the writer writes, instead of the old
+  isolated `pmf_decisions` silo nobody else touched — so recall is real, not theatre. The
+  idempotent seed of the tracked `tickets/[Product]` snapshots is preserved (so a fresh box still
+  has prior decisions before any `agent_run` write lands) but tagged `source:"ticket_seed"` to stay
+  distinct from accumulated `source:"agent_run"` decisions. Verified: the repointed consult returns
+  the seeded `GLO-12` decision **and** the loop's own `agent_run` writes, and
+  `assert_pmf_ranked.py` stays exit-0 with `prior_decisions_consulted.mem0_hits` populated from
+  `memories`.
+- **Q3 — the deterministic helper is load-bearing; the Hermes-native path is a *probe*, not a
+  dependency.** Passive capture is unavailable for this stack (inference routes through the Nous
+  Portal proxy, not mem0's OpenAI-compatible proxy), so an explicit `add()` is the only guaranteed
+  mechanism. Whether the closed-source `hermes-agent` binary *also* writes `memories` on its own via
+  `hermes/mem0.json` is answered empirically — not left open — by the non-gating diagnostic
+  `scripts/diagnose_hermes_mem0_write.py`, which runs one loop with the helper disabled
+  (`MEM0_RECORD_DECISION_DISABLE=1`) and reports a machine-readable verdict.
+
+  > **Recorded Q3 verdict (2026-06-28, CONCLUSIVE):**
+  > `{"verdict": "NO_NATIVE_WRITE", "collection": "memories", "user_id": "sovereign-cto",
+  > "baseline_rows": 4, "post_rows": 4, "delta": 0, "loop_ran": true, "loop_rc": 0}`
+  >
+  > Ran with all three prerequisites satisfied: the `hermes` binary on PATH, the
+  > `graphify-out/service-graph.html` input (generated via `scripts/run_graphify.sh`), and reachable
+  > Nous inference. **The closed-source `hermes-agent` binary does NOT write the `memories` collection
+  > on its own.** A full hero loop ran with our deterministic helper disabled (`rc=0`, 13 real tool
+  > calls incl. `query_cto_knowledge` + `save_issue`), yet `memories` stayed at 4 rows (delta +0). This
+  > empirically confirms design Q3: passive/native capture is unavailable for our architecture, so the
+  > deterministic `mem0_record_decision.py` helper is **REQUIRED**, not merely a complement.
+  >
+  > **Inference-path correction (learned while running this probe):** `hermes -p` talks DIRECTLY to the
+  > Nous remote API (`https://inference-api.nousresearch.com/v1`, provider `nous`) using the OAuth
+  > credential from `hermes portal login` — it does **not** route through the optional local
+  > `hermes proxy` on `:8645` (nothing in our loop does). The probe's reachability guard therefore
+  > checks the remote inference API, not `:8645`; a network/timeout failure there yields `INCONCLUSIVE`
+  > rather than a false `NO_NATIVE_WRITE`. (`hermes portal login` is one-shot OAuth onboarding — it
+  > authenticates the host and is not re-run per session; the credential persists in `~/.hermes`.)
+
+- **Q4 — `infer=True` (mem0's intended extraction), self-skipping to `infer=False` when Ollama is
+  down.** The write feeds mem0 the whole turn so the extraction LLM pulls salient facts, dedups,
+  and entity-links (`>= v2.0.0` native). When the local Ollama fact-extractor is unreachable the
+  helper degrades to `infer=False` (the raw turn still persists, the collection still accumulates,
+  recall extraction is skipped) and logs the downgrade — mirroring the round-trip's Ollama self-skip
+  so CI never depends on a local LLM. The write **never** silently no-ops: a row always lands,
+  tagged `source:"agent_run"` + `decision_id`.
+
+**The gate (design Q5 — tolerant of `infer=True` phrasing).** `scripts/assert_memory_accumulates.py`
+drives the writer twice in an *isolated* `memacc_<uuid>` collection (so it neither depends on nor
+pollutes the live `memories`) and asserts, scripted: the `source:"agent_run"` count grew after each
+run; a `search()` for run 2's topic returns run 2's `decision_id`; run 2 *also* recalls run 1's
+`decision_id` (accumulation, not overwrite); and the recalled decision text is **not a substring of
+any `tickets/*.md`** — the load-bearing "accumulated via the write path, not re-seeded from the git
+snapshots" proof. Verified exit 0 (run 1: 0→2 rows, run 2: 2→4 rows, both decision ids recalled,
+no ticket-substring leak).
+
+**spaCy lemmatization (`mem0ai[nlp]`) — the hybrid LEXICAL index now uses real lemmas.** mem0 OSS
+`>= v2.0.0` builds a hybrid retrieval index whose lexical half is a Postgres
+`gin to_tsvector('simple', payload->>'text_lemmatized')` over a *lemmatized* copy of each memory.
+Without spaCy, mem0 logged **`Failed to load spaCy lemma model`** and fell back to a simpler
+tokenizer (worse keyword recall). We pinned the **`mem0ai[nlp]`** extra (which pulls spaCy) in every
+mem0-touching script's PEP 723 header — the three new ones (`mem0_record_decision.py`,
+`assert_memory_accumulates.py`, `diagnose_hermes_mem0_write.py`) and the two existing
+(`mem0_roundtrip.py`, `mem0_pmf_decisions.py`) — changing `"mem0ai>=2.0.0,<3.0.0"` →
+`"mem0ai[nlp]>=2.0.0,<3.0.0"`. spaCy also needs the `en_core_web_sm` model: the writer proactively
+warms mem0's own lemma loader, which downloads the model once if missing and otherwise **degrades
+with a logged note** (never hard-fails — same Ollama-style self-skip philosophy). Verified: across
+the `record_decision` smoke, the accumulation gate, and the NO_AGENT PMF loop the logs now read
+`spaCy lemma model loaded` / `spaCy lemma model ready` and the `Failed to load spaCy lemma model`
+warning is **gone**; persisted rows carry a populated `text_lemmatized` (e.g. `couple coupling`,
+`refactore refactoring`), confirming the lexical index is lemmatized.
+
+> _Grounded in: *Accelerate* — close the feedback loop so the system learns from its own delivered
+> work; *An Elegant Puzzle* (Larson) — a guaranteed deterministic mechanism over a probabilistic
+> one for a step that must happen every run. Git history stays the authoritative decision record;
+> mem0 is the recall complement that must never become load-bearing for correctness._
+
+**Recorded alternative considered and rejected — mem0 passive capture via its OpenAI-compatible
+proxy.** The Q3 probe proved the `hermes-agent` binary does not write `memories` natively, which
+raises the obvious question: *could we get passive, "as-intended" capture by routing inference
+through mem0?* Technically **yes** — mem0's only passive mode is its OpenAI-compatible proxy
+(`mem0.proxy.main.Mem0`), which auto-`add()`s every turn **when, and only when, the LLM call flows
+through mem0 itself**. Today `hermes -p` talks straight to the Nous remote API (provider `nous`,
+OAuth), so mem0 is never in that path. To enable passive capture you would **chain the inference
+path**: `hermes-agent → mem0 proxy → hermes proxy (:8645, OAuth→Nous)` — point Hermes' provider at
+mem0's proxy as an OpenAI-compatible `base_url`, and mem0 forwards to the local `:8645` shim (which
+already performs the OAuth translation) while silently capturing each turn. **We reject this for
+GLO-14** because it places mem0 **in the critical inference hot path**: a mem0 outage would break
+every agent call, and it captures raw conversational turns (noisy, untagged) instead of curated,
+metadata-tagged, gate-able decisions — directly violating the standing rule that *mem0 is a recall
+complement, never load-bearing for correctness* (AGENTS.md rule 2; git stays authoritative). The
+deterministic `mem0_record_decision.py` writer gives strictly better control for our purpose. The
+option is **rolled forward to Part C** below (and into the next epic's ticket) as a documented,
+deliberately-deferred path — *here is exactly how to enable it if a future epic ever wants
+passive capture*, with the load-bearing tradeoff stated up front.
+
+### GLO-14 P3 — Greptile PR review as a standing ticket-instruction line (built; fully decoupled)
+
+**Decision (design D-3/D-4): the ONLY in-repo Greptile deliverable is a standing instruction
+LINE appended to every filed ticket body, plus a gate that reads it back.** There is **no in-repo
+Greptile code, no MCP server, no webhook receiver, and no `query_cto_knowledge` triage** — those
+were considered (the next-epic ticket sketches a webhook→resume→review→triage loop) and
+deliberately **kept out of this repo**. The Greptile CLI, the Claude Code skill, and the
+`/greptile` command are set up **globally in `~/.claude`, OUTSIDE this repo** (a separate,
+project-agnostic task, not a GLO-14 repo deliverable and not tracked here). This repo's surface is
+exactly: the filing skills (`hermes/skills/file_brownfield_ticket.md`, `pmf_brief.md`,
+`pmf_rank.md`) and the epic filer (`scripts/file_fullbuild_ticket.py`) append the literal line —
+
+> _After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings
+> before requesting merge._
+
+— to the end of every `[Brownfield]`/`[Product]`/`[Full-Build]` ticket body, and
+`scripts/assert_greptile_instruction.py` gates it.
+
+**Why decoupled (D-3/D-4).** The sovereign-CTO payoff Greptile adds is "agents that ship *and*
+review," but the *mechanism* that runs the review is project-agnostic developer tooling — it
+belongs in the global `~/.claude` profile that any repo's PRs can use, not baked into this stack.
+Embedding a Greptile MCP/webhook here would (a) couple this repo to a specific review vendor's
+runtime, (b) duplicate setup that already lives globally, and (c) re-introduce an
+inference-hot-path / always-on-service dependency of exactly the kind we rejected for mem0 passive
+capture above. The standing instruction line is the thin, durable, in-repo contract; the heavy
+lifting stays out-of-repo. **The Greptile GitHub App is the no-code fallback** — it auto-reviews
+on PR-open with no custom hook — so even without the global CLI a reviewer path exists; the
+in-repo line just makes "run the review" a non-optional standing instruction on every ticket.
+
+**The gate (mirrors `assert_brownfield_ticket.py`).** `scripts/assert_greptile_instruction.py`
+reads the newest filed ticket back over the SAME Linear MCP endpoint Hermes uses **and** reads the
+tracked `tickets/<ID>.md` snapshot, asserting **both** carry the instruction line. Asserting both
+proves the line survives the full path (agent files it into Linear → `snapshot_tickets.py`
+persists it into git), not just one end. The match is tolerant of trivial wording-around (it keys
+on "run Greptile … (/greptile) … address the findings") so a human copy-edit of the surrounding
+prose doesn't break the gate while the operative instruction stays required. Verified exit 0 on
+the newest `[Brownfield]` ticket (GLO-18) and on the next-epic `[Full-Build]` (GLO-14); the
+unrelated `assert_brownfield_ticket.py` / `assert_product_ticket.py` invariants stay exit 0 (the
+appended line is purely additive — it does not disturb the grounding/label/`src/<service>/`
+checks).
+
+> _Grounded in: *Accelerate* — peer review / fast feedback on every change as a delivery-
+> performance practice; *An Elegant Puzzle* (Larson) — keep project-agnostic tooling out of the
+> product repo and make the standing expectation explicit rather than embedding a vendor runtime._
+
+### GLO-14 P5 — Close the PMF North Star loop: a Stripe-grounded shipped-bet flip (built)
+
+**Decision (design D-5, Option C): flip `pmf_ledger.json[].shipped false -> true` from a
+recorded shipped-result that is GROUNDED in real Stripe data — so "shipped" means a
+*measured* outcome, never a hand-set flag.** The Backlog-P4 PMF loop ranks opportunities and
+stamps each `shipped: false`, and the North Star metric is `opportunities_shipped` — but
+nothing ever flipped a row, so the loop proposed forever and never closed. This slice adds the
+missing feedback edge.
+
+**What's built.** `scripts/pmf_shipped_results.py` is a small, deterministic module with two
+pieces, the `fuse_signals.py` additive/atomic pattern throughout:
+
+- a SHIPPED-RESULT RECORD, `recordings/shipped_results.json` — one entry per shipped bet
+  (`bet_id` + measured `metric`/`value` + the `stripe_metrics.json` grounding ref);
+- a DETERMINISTIC JOINER, `flip_shipped(ledger, results, stripe_metrics) -> int`, that joins
+  the records onto the ledger by bet id (the opportunity title or its rank), flips each
+  matching row `shipped false -> true`, and stamps `grounded_in += ["stripe_metrics.json"]`
+  (idempotent — never duplicated). It reads the WHOLE ledger, mutates only the target rows,
+  and writes the whole doc back via `os.replace` — **never clobbering any other ledger key**
+  (`question`, `scoring_model`, `prior_decisions_consulted`, the unrelated opportunities).
+
+It is wired into `scripts/pmf_kanban_run.sh` immediately after the ledger write: a no-op (0
+rows) on a default run with no recorded result, and a real flip when a result has been
+recorded. A flip is **itself a decision**, so each flipped row is recorded into the unified
+mem0 `memories` collection via the Phase-2 `mem0_record_decision.py` helper (sequenced after
+P1's write path closed, exactly as this phase depends on).
+
+**Decision: GROUNDED, not asserted — refuse to flip on a fabricated number.** A shipped-result
+is honored **only** when its recorded metric value equals a value actually present in
+`recordings/stripe_metrics.json` (the real test-mode MRR/churn/cohort figures
+`scripts/stripe_client.py` computes from the live Stripe API). A record whose value is not a
+real Stripe figure is REFUSED — the same no-fabrication contract that runs through
+`stripe_client.py`. No new Stripe surface and no new egress endpoint were added: the joiner
+reuses the already-computed `stripe_metrics.json` artifact via a tiny additive
+`stripe_client.load_metrics()` read helper (no API re-hit).
+
+**The gate.** `scripts/assert_shipped_flip.py` seeds a `shipped_results.json` for a known bet
+(the rank-1 opportunity, grounded in the real MRR read straight out of `stripe_metrics.json`),
+runs the joiner on an **isolated temp copy** of the ledger (mirroring how
+`assert_memory_accumulates.py` uses a throwaway collection — the real tracked
+`recordings/pmf_ledger.json` is never mutated and stays all-false), and asserts: the target
+bet flipped to `true`; its `grounded_in` cites `stripe_metrics.json`; the recorded metric value
+EQUALS a real `stripe_metrics.json` value (the MRR/churn cross-read — "measured real outcome");
+every unrelated opportunity stayed `false`; and every other ledger key is preserved
+byte-for-byte. `scripts/assert_pmf_ranked.py` stays exit 0 (the ledger schema + ranking
+invariants are untouched — `shipped` and `shipped_result` are additive fields).
+
+> _Grounded in: *Hacking Growth* — a North Star (opportunities **shipped**) measured from real
+> outcomes over vanity output; *Lean Analytics* / *The Lean Product Playbook* — validate a bet
+> against a real revenue/retention metric, not a self-asserted flag; *Accelerate* —
+> deterministic, reproducible, gate-able state changes over hand edits._
+
+### GLO-14 P3 / D-2 — Fuller multi-component demo + read-only memory view + optional authenticated Linear ending (built)
+
+**Decision (design D-2: Option A montage spine + Option B lightweight memory view).** The recorded
+demo previously surfaced only two surfaces (a tool-call log + the coupling graph) and ended on a
+locally-rendered ticket snapshot. This slice makes the montage show **more of the stack** and adds a
+cheap read-only memory view, while keeping every default path **reproducible from a clean clone**.
+
+**The D-2 segment list (what the montage now tells).** `build_showcase_video.py`'s `catalogue()`
+was extended so the montage reads as the fuller story: the visual hero loop + the existing
+artifact-backed data surfaces (egress **403** refusal, Stripe MRR/churn, SonarQube fusion, the
+RICE ledger incl. the P5 `shipped` flip) **plus four always-rendered title-carded chapters** —
+the **mem0 memory view**, the **Kanban** create→claim→complete lifecycle, the **Greptile** PR-review
+instruction, and the **Linear ticket ending**. Lower-signal components (per the component-inventory
+map: Nous Portal inference, `fuse_signals`, Codegen routing, the gate battery, the MicroVM spike)
+become title cards rather than bespoke live captures — the graceful-degradation montage philosophy
+(design Q6) carried forward. `assert_showcase_video.py` raises the manifest minima accordingly
+(`SHOWCASE_MIN_SEGMENTS=5` + a required-id check on the four D-2 title segments; both env-overridable
+so a deliberately smaller montage is still possible). **Final segment ORDERING is a collaborative
+human micro-detail (D-2 open question), not gated.**
+
+**The read-only memory view (P1 made visible).** `scripts/render_memory_card.py` is a NEW read-only
+surface that queries the unified `memories` rows + mem0-native entity links and renders them to a
+self-contained `file://` HTML — reusing the `render_ticket_card.py:51-107` marked.js template /
+screenshot pattern (a module-level f-string + an inlined `json.dumps` payload + one CDN `<script>`,
+no build step). It **never writes** to mem0 and degrades gracefully (emits a valid "collection
+unreachable" card) if pgvector is down — the load-bearing accumulation proof remains
+`assert_memory_accumulates.py`; this card is the *visualization*. A `--baseline`/`--against` diff
+mode highlights rows that are NEW since a snapshot, which is exactly what the new
+`scripts/assert_memory_view_grows.py` gate uses to SCRIPT the "visibly more rows after a loop" claim
+(render before → run one decision through the real write path → render after → assert the parsed
+count strictly grew). The gate runs against a throwaway isolated collection, so it never pollutes the
+live `memories`.
+
+**Decision: the default ending stays the reproducible `file://` snapshot; the authenticated
+live-Linear ending is OPTIONAL and gated, never the default.** The throwaway container Chromium has
+no Linear session, so the live ticket URL hits Linear's auth wall. Rather than make the demo depend
+on a host-held login, the **default** ending remains the git-tracked `tickets/<ID>.md` snapshot
+rendered to `file://` (no auth, always passes `verify_recording.py`). The authenticated ending is
+opt-in: `recorder/entrypoint.sh`'s `launch_browser` appends `--user-data-dir=$CHROMIUM_USER_DATA_DIR`
+**only when that env var is set**, `docker-compose.yml` bind-mounts a **gitignored**
+`./recorder-profile` (it holds a live session — never committed, AGENTS.md rule 3/8), and
+`record_run.sh`'s `TICKET_LIVE_URL=1` block resolves the filed ticket URL and launches the right
+pane with that persistent profile so a logged-in session carries into the capture.
+
+**Decision: gate the WIRING, leave the live-session eyeball to a human.** Proving a recording ends
+on the *genuine* authenticated Linear page needs a human-held Linear session — that stays a human
+checkpoint. But the wiring ("does the recorder launch Chromium WITH `--user-data-dir` when a profile
+is provided?") is fully automatable: `scripts/assert_persistent_profile_wiring.py` drives the real
+`launch_browser` path inside the running recorder with a **throwaway** `--user-data-dir` and a
+harmless local target, then asserts the launched command carried the flag (and that Chromium
+populated the dir) — exercising the wiring with no real Linear session. This keeps the falsifiable
+exit-0 contract on the load-bearing mechanism while honestly scoping the two genuinely-human checks
+(the authenticated-session eyeball and the collaborative segment ordering).
+
+> _Grounded in: *The Lean Startup* — demo the working system honestly (a reproducible default that
+> never fakes auth) over a staged screenshot; *Accelerate* — reproducible-from-clean-clone artifacts
+> and deterministic exit-0 gates over manual, un-reproducible captures; *Building Microservices* —
+> visualize the real component topology (the coupling graph, the memory layer, the Kanban lifecycle)
+> so the architecture is legible, not asserted._
+
+**Decision (Greptile review follow-up): the `login` VNC bridge requires auth + loopback-only
+publishing — no password-less default.** A Greptile PR review (the same standing review this epic
+adds in P2) flagged that the one-shot `login` verb started `x11vnc` with `-nopw` by default while the
+documented `docker compose run` published `5900` on all interfaces — during the login window a **live
+Linear OAuth session** is being written to the profile, so any LAN host could connect and drive it.
+Hardened: `recorder/entrypoint.sh` now **refuses** the password-less path unless the operator
+explicitly opts in with `VNC_ALLOW_NOPW=1`, and both the verb's log line and `docs/setup-guide.md`
+publish the port **loopback-only** (`-p 127.0.0.1:5901:5900`) with a throwaway `VNC_PASSWORD`. (x11vnc
+still binds `0.0.0.0` *inside* the container because Docker's port-forwarder cannot reach a
+container-loopback bind; the host-side `127.0.0.1` mapping is what actually confines exposure.)
+This is the review loop working as designed — a finding caught, grounded, and fixed in the same PR.
+
+### GLO-14 P4 — Host-orchestrator MicroVM confinement spike (spiked + documented; design Q9 Option A)
+
+**The gap this addresses.** The GLO-13 P1 egress slice confines the *containerized* sub-tools
+(`egress/policy.yaml` enforced by a real OpenShell sandbox). The **host Hermes orchestrator itself**
+— the "brain" — still runs **outside any sandbox** on the macOS host. Confining its egress means
+moving the host process into a **MicroVM** (OpenShell's opt-in `vm` compute driver: libkrun + Apple
+Hypervisor.framework). That is the single biggest moving-parts / DNS risk in the stack.
+
+**Decision: spike + document, do NOT commit a fragile default build (Q9 Option A).** Acceptance
+criterion #4 is "scoped **or** built". Rather than wire a brittle `OPENSHELL_DRIVERS=vm` build onto
+the EOD critical path, this slice ships a scripted, graceful-degradation **spike**
+(`scripts/microvm_spike.sh`) that stands up the `vm` driver far enough to clear the known macOS bugs,
+captures the evidence to `recordings/microvm_spike_<ts>.log`, and records this dated go/no-go. The
+falsifiable contract is `scripts/assert_microvm_spike.py` (tolerant): it asserts the spike log + this
+dated go/no-go exist, and — *when a future spike runs an in-guest workload* — asserts the three
+per-bug probes (`.local` mDNS CONNECT fails, Landlock reports `best_effort`/no-op, virtio-fs
+case-sensitivity) match this record; each probe self-skips (logged `SKIP`, still exit 0) if the VM
+did not get that far, so the gate degrades gracefully on a host that can't boot a full guest.
+
+**What the spike actually found on this Apple-Silicon host (2026-06-28).** The opt-in `vm` compute
+driver binary (`openshell-driver-vm`, ~39 MB) **is installed** in OpenShell 0.0.71's libexec, **is
+codesigned with the `com.apple.security.hypervisor` entitlement**, and — when launched to a private
+gRPC socket — **boots: it acquires Hypervisor.framework and binds its socket** (`VM_DRIVER_BOOTED=yes`
+in the log), creating its `images/`+`sandboxes/` state. So the libkrun VM *driver layer* is viable
+here. The spike **deliberately stops short** of the fragile remainder (Q9 boundary): it does **not**
+destructively reconfigure the running gateway to `OPENSHELL_DRIVERS=vm` (the egress gate depends on
+the Docker driver staying up; no sudo, non-destructive), does **not** mint a guest bootstrap image +
+guest-TLS, and does **not** run the host orchestrator inside the guest end-to-end. Those are exactly
+the steps that carry the four macOS limitations below.
+
+**The four documented macOS limitations** (the reason this is a spike, not a default build):
+
+1. **Landlock `best_effort` is a no-op on XNU.** Landlock is a *Linux* LSM; on the macOS host kernel
+   it silently degrades (OpenShell #803). Filesystem confinement is therefore **not** the
+   load-bearing layer — the network OPA-CONNECT layer is (which is why the GLO-13 egress gate's
+   load-bearing assertion is a *network* 403, independent of Landlock).
+2. **mDNS `.local` non-traversal.** A guest cannot resolve host `.local` mDNS names (e.g.
+   `inference.local`), so a guest→host local-Ollama DNS path is broken. We sidestep it entirely:
+   inference stays **cloud** (Nous Portal).
+3. **No CUDA on Apple Silicon.** No local GPU passthrough for inference; the `--gpu` vm-driver path
+   is moot here. Inference is cloud by design — not a regression.
+4. **Case-sensitive vs case-insensitive APFS over virtio-fs.** The macOS host FS is
+   case-**insensitive** by default while a Linux guest expects case-**sensitive**; shared virtio-fs
+   mounts can collide or resolve surprisingly, a real hazard for any host-dir share into the guest.
+
+**Go/no-go (dated 2026-06-28): NO-GO for a default MicroVM host-confinement build this epic; GO to
+keep it as the next hardening step.** The driver layer boots, which clears the *first* risk, but the
+load-bearing remainder (gateway reconfigure + guest bootstrap + virtio-fs host-dir sharing + the
+`.local`/DNS path for any host service) is precisely the fragile surface Q9 flagged, and three of the
+four limitations bite exactly there. The honest, evidence-backed call is to **NOT** make this the
+default now; the spike + this record satisfy acceptance #4 ("scoped"). **Human decision (confirmed
+2026-06-28): NO-GO — scope only; defer the build to a future hardening epic.** The optional P3
+montage segment #20 (the `openshell status` + driver-boot capture) was also declined — the showcase
+montage already tells the story without it; the captured spike log remains the evidence of record.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — sequence the hardening investment; clear the cheapest
+> risk first (does the driver even boot?) and record the stronger confinement as a deliberate next
+> step rather than over-engineering the platform before the deadline; *Accelerate* — make the safety
+> investigation reproducible and evidence-driven (a scripted spike + a captured log + an exit-0 gate)
+> rather than an un-reproducible manual experiment._
+
+### GLO-14 closeout (Phase 7) — Part C deferral capture + the next epic (design D-6 / Q11 / Q12)
+
+The D-6 closeout boundary is reached: GLO-14's full-epic scope (P1–P5 + this Part C capture) is
+**substantially actioned and gated** — `scripts/assert_closeout_ready.py` measures it (every prior
+gate exit-0 + the GLO-14 acceptance checklist in `tickets/GLO-14.md` fully ticked), so "substantially
+actioned" is a scripted contract, not a feel call. With that proven, the next full-build epic is
+authored (`scripts/file_fullbuild_ticket.py --closeout-epic`) and snapshotted to `tickets/` (rule 7).
+The deferrals rolled forward into it, each with scope + rationale (acceptance #5):
+
+- **Moderne / OpenRewrite (Q11 — no account; OSS-pilot preserved as an option).** *Scope:* the
+  deterministic, recipe-based mass-refactor back-end alongside Codegen (recipe-amenable + Java debt
+  Codegen does not cover). *Why deferred:* no Moderne account is provisioned, so the paid-recipe
+  evaluation is **NOT** executed this epic; remediation continues to route to **Codegen
+  ("named-only")**. A **commented `moderne` stub is staged in `hermes/config.yaml mcp_servers`**
+  (documenting `mod config agent-tools install`) — deferred, *not* registered. The **OpenRewrite-OSS
+  pilot** is preserved as the no-account path: a future epic can pilot one recipe without a paid
+  account and record the route-to-Moderne-vs-Codegen decision here.
+- **mem0 OSS server + Next.js read-only dashboard (Q12 — deferred; promoted to a build item now).**
+  *Scope:* a small Next.js read-only view over the now-accumulating `memories` collection (entity
+  links, per-run decisions, search). *Why deferred:* GLO-14 built a *lightweight static* memory card
+  (`render_memory_card.py`) that verifies the phase, and no frontend scaffolding exists in the repo;
+  a full dashboard is a visualization nicety. *Why it's worth more now:* P1/P2 made `memories`
+  actually fill up, so a dashboard over a growing memory beats one over an empty one — it leads the
+  next epic's backlog.
+- **OpenHands via Portal/LiteLLM.** *Scope:* autonomous greenfield prototyping pointed at the Nous
+  Portal OpenAI-compatible endpoint via LiteLLM (`LLM_MODEL`/`LLM_API_KEY`/`LLM_BASE_URL`). *Why
+  deferred:* the greenfield path stays "Hermes research → HumanLayer ticket → Claude Code executes";
+  Claude Code Max OAuth tokens are blocked in third-party tools, so the LiteLLM-on-Portal route is
+  the chosen future enablement (avoids a separate Anthropic key).
+- **Second-account "fresh setup" walkthrough.** *Scope:* document a two-account topology. *Why
+  deferred:* the single-account / multiple-profiles topology is what makes the shared Kanban board
+  work (Hermes has no cross-account coordination primitive); two-account is future-only.
+- **mem0 passive capture via the OpenAI-compatible proxy (Q3 follow-on).** *Scope / enablement path
+  + the load-bearing rejection rationale are recorded in full in the GLO-14 P2 section above* — kept
+  in the rolled-forward set so a future epic can adopt it deliberately. *Why still deferred:* it
+  places mem0 in the critical inference hot path and captures noisy raw turns, violating the
+  "complement, never load-bearing" rule; the deterministic writer is the better fit.
+
+**Items discovered while building GLO-14 P1–P5 (folded into the next epic).** (1) The **Greptile
+global setup** is an **out-of-repo prerequisite** (CLI + Claude Code skill + `/greptile` command in
+`~/.claude`), not a repo deliverable — recorded so a fresh clone knows the dependency. (2) A
+**live-profile skill-deploy step**: the tracked `hermes/skills/*.md` (incl. the Greptile instruction
+line) must be synced into each live `~/.hermes` profile for the instruction to actually fire. (3) A
+**duplicate-finding dedupe** need: re-filing `[Brownfield]` tickets produced duplicates
+(GLO-8/9/10/11 → re-centered GLO-15/16), so a dedupe/consolidation step keeps the tracker and
+`tickets/` snapshots clean.
+
+**The next epic** (Part D recurrence) re-prioritizes these: mem0 dashboard (P1), Moderne/OpenRewrite
+(P2), the deeper in-repo Greptile-triage loop (P3), the MicroVM build remainder (P4 — GLO-14 P4's
+deferred remainder), then OpenHands + the second-account walkthrough (P6). It carries the
+`[Full-Build]` label and is snapshotted to `tickets/`; `scripts/assert_fullbuild_ticket.py
+--next-epic` asserts it rolls forward Moderne + the mem0 dashboard + OpenHands and that the snapshot
+exists.
+
+> _Grounded in: *An Elegant Puzzle* (Larson) — a self-perpetuating roadmap: close one epic by
+> authoring the next, rolling forward the remainder and what you learned building it; *Accelerate* —
+> make the closeout boundary itself a falsifiable, scripted gate rather than a judgment call._
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the
@@ -497,6 +920,16 @@ rationale below is the interview-ready "why now / why not now" for each.
 - **Full mem0 OSS server + Next.js dashboard.** *Deferred because:* Phase 1 uses the mem0
   SDK-on-host against pgvector — minimal moving parts on the critical path; the dashboard is not
   required to verify any phase, and the M3 can add it later resource-wise.
+- **mem0 passive capture via its OpenAI-compatible proxy (GLO-14 Q3 follow-on).** *Deferred —
+  considered and rejected for now.* The Q3 probe confirmed the Hermes binary does not write
+  `memories` natively, so the only route to "passive, as-intended" capture is to chain inference
+  through mem0's proxy: `hermes-agent → mem0 proxy (mem0.proxy.main.Mem0) → hermes proxy (:8645,
+  OAuth→Nous)`, with mem0 silently `add()`-ing every turn. *Why not now:* it puts mem0 **in the
+  critical inference hot path** (a mem0 outage breaks every agent call) and captures noisy raw turns
+  instead of curated, tagged, gate-able decisions — violating the standing rule that mem0 is a recall
+  complement, never load-bearing (git stays authoritative). The deterministic
+  `mem0_record_decision.py` writer is the better fit. Recorded here (with the exact enablement path)
+  so a future epic can adopt passive capture deliberately if the tradeoff ever becomes worth it.
 - **OpenHands via Portal/LiteLLM (Q7).** *Deferred because:* the greenfield path for now is
   "Hermes research → HumanLayer Linear ticket → Claude Code executes." Claude Code Max cannot back
   OpenHands (OAuth tokens blocked in third-party tools); pointing OpenHands at the Portal

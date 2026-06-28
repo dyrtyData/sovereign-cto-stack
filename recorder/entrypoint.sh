@@ -64,6 +64,15 @@ has_mapped_window() {
 # --- paint a browser surface (URL or local HTML file) ------------------------
 # $2 (optional) "right" tiles the browser to the right HALF of the screen (for the
 # split-screen); default is full-screen kiosk.
+#
+# GLO-14 P3: when CHROMIUM_USER_DATA_DIR is set (a bind-mounted, PERSISTENT and
+# AUTHENTICATED Chromium profile — see docker-compose.yml + scripts/record_run.sh's
+# TICKET_LIVE_URL=1 path), Chromium launches WITH `--user-data-dir=<that dir>` so a
+# real logged-in Linear session is carried into the capture (the live authenticated
+# Linear ending). With NO such dir set (the reproducible DEFAULT), Chromium launches
+# throwaway/sessionless exactly as before — so the default `file://` snapshot ending
+# is unchanged and never depends on any host-held session. The profile dir is
+# gitignored (no session secrets committed — AGENTS.md rule 3/8).
 launch_browser() {
   local target="$1"
   local where="${2:-full}"
@@ -76,6 +85,14 @@ launch_browser() {
     w=$(( SCREEN_W / 2 )); x=$(( SCREEN_W - w ))
     # not kiosk when tiled (kiosk forces fullscreen and ignores geometry)
     args=(--window-position="${x},0")
+  fi
+
+  # Persistent authenticated profile (GLO-14 P3, OPTIONAL): only when a profile dir
+  # is mounted. Default runs leave this empty -> sessionless throwaway browser.
+  if [ -n "${CHROMIUM_USER_DATA_DIR:-}" ]; then
+    mkdir -p "$CHROMIUM_USER_DATA_DIR" 2>/dev/null || true
+    args+=(--user-data-dir="$CHROMIUM_USER_DATA_DIR")
+    log "using PERSISTENT Chromium profile --user-data-dir=$CHROMIUM_USER_DATA_DIR (authenticated-session path)"
   fi
 
   log "painting browser surface: $target (where=$where, ${w}x${SCREEN_H}+${x})"
@@ -245,6 +262,10 @@ case "$cmd" in
   #   navigate <url>
   navigate)        start_xvfb; navigate_url "$1" ;;
   surface-html)    start_xvfb; launch_browser "file://$1" ;;
+  # GLO-14 P3 / D-2: paint the read-only mem0 memory card (a local file:// HTML the
+  # host renders via scripts/render_memory_card.py). Same throwaway/no-auth path as
+  # surface-html — kept as a NAMED verb so the montage step reads self-documenting.
+  surface-memory)  start_xvfb; launch_browser "file://$1" "${2:-full}" ;;
   surface-banner)  start_xvfb; launch_banner "${1:-Sovereign CTO — recording}" ;;
   # split-screen hero: live agent-log terminal (left) + graph html (right)
   #   surface-split <logfile> <html-file> [title]
@@ -254,10 +275,63 @@ case "$cmd" in
   surface-logterm) start_xvfb; launch_log_terminal "$1" "${2:-agent}" ;;
   start)           start_xvfb; start_capture "${1:-}" ;;
   stop)            stop_capture ;;
+  # GLO-14 P3: OPTIONAL one-time interactive login to persist a real Linear session
+  # into the mounted --user-data-dir (the authenticated live-Linear ending). Launches
+  # Chromium (full screen, persistent profile) at the given URL, then bridges :99 over
+  # VNC (5900) so a human can SEE and CLICK to log in. The Linux Chromium writes the
+  # session cookie into /recorder-profile itself — so the recording reuses it natively
+  # (a macOS-host Chrome profile would NOT decrypt under Linux Chromium). One-shot only.
+  #
+  # SECURITY (GLO-14 P3 — Greptile review): during this login window a LIVE Linear OAuth
+  # session is being written to the profile, so the VNC bridge MUST NOT be exposed to the
+  # LAN. Two guards, both required:
+  #   1. A VNC_PASSWORD is MANDATORY (no password-less default). To run a no-auth session
+  #      anyway (e.g. an isolated host) you must OPT IN explicitly with VNC_ALLOW_NOPW=1.
+  #   2. Bind the published port to the host LOOPBACK only — `-p 127.0.0.1:5900:5900` —
+  #      so only this machine can reach it. (x11vnc itself listens on 0.0.0.0 INSIDE the
+  #      container because Docker's port-forwarder cannot reach a container-loopback bind;
+  #      the host-side 127.0.0.1 mapping is what actually confines exposure.)
+  #   VNC_PASSWORD=$(openssl rand -base64 12) \
+  #   docker compose run --rm -p 127.0.0.1:5900:5900 \
+  #       -e VNC_PASSWORD -e CHROMIUM_USER_DATA_DIR=/recorder-profile recorder login
+  # then connect a VNC viewer to localhost:5900 (macOS: Finder → Go → Connect to
+  # Server → vnc://localhost:5900), log into Linear, and Ctrl-C when done.
+  login)
+    if [ -z "${CHROMIUM_USER_DATA_DIR:-}" ]; then
+      echo "login: refusing — set CHROMIUM_USER_DATA_DIR (e.g. /recorder-profile) so the session persists" >&2
+      exit 2
+    fi
+    # Mandatory VNC auth: a live Linear session is exposed over :5900 during login, so we
+    # refuse the password-less path unless the operator explicitly opts in (VNC_ALLOW_NOPW=1)
+    # AND, even then, only confine exposure via the documented host-loopback port mapping.
+    if [ -z "${VNC_PASSWORD:-}" ] && [ "${VNC_ALLOW_NOPW:-}" != "1" ]; then
+      echo "login: refusing — set VNC_PASSWORD (e.g. VNC_PASSWORD=\$(openssl rand -base64 12)) so the" >&2
+      echo "       VNC bridge is authenticated; a LIVE Linear session is exposed on :5900 during login." >&2
+      echo "       Also publish loopback-only: docker compose run --rm -p 127.0.0.1:5900:5900 ... recorder login" >&2
+      echo "       (To run no-auth on an isolated host anyway, set VNC_ALLOW_NOPW=1 — not recommended.)" >&2
+      exit 2
+    fi
+    start_xvfb
+    # A prior container that held this profile can leave a stale SingletonLock/Socket
+    # behind; the new Chromium then sees "profile in use" and exits instantly (black
+    # screen over VNC). Clear the stale singletons before launching (safe: nothing
+    # else uses this profile in the one-shot login container).
+    rm -f "$CHROMIUM_USER_DATA_DIR"/Singleton* 2>/dev/null || true
+    launch_browser "${1:-https://linear.app}" full
+    log "login: Chromium up on $DISPLAY_NUM with persistent profile $CHROMIUM_USER_DATA_DIR"
+    # x11vnc binds 0.0.0.0 INSIDE the container (Docker's forwarder can't reach a
+    # container-loopback bind); confine real exposure with `-p 127.0.0.1:5900:5900`.
+    if [ -n "${VNC_PASSWORD:-}" ]; then
+      log "login: starting x11vnc on :5900 (password auth) — publish loopback-only (-p 127.0.0.1:5900:5900), connect your VNC viewer, log into Linear, then Ctrl-C"
+      exec x11vnc -display "$DISPLAY_NUM" -forever -shared -passwd "$VNC_PASSWORD" -rfbport 5900 -listen 0.0.0.0 -quiet
+    fi
+    log "login: WARNING starting x11vnc on :5900 with NO AUTH (VNC_ALLOW_NOPW=1) — ensure -p 127.0.0.1:5900:5900 so it is loopback-only; log into Linear, then Ctrl-C"
+    exec x11vnc -display "$DISPLAY_NUM" -forever -shared -nopw -rfbport 5900 -listen 0.0.0.0 -quiet
+    ;;
   snapshot)        start_xvfb; snapshot "${1:-/recordings/frame.png}" ;;
   has-window)
     start_xvfb
     if has_mapped_window; then echo yes; exit 0; else echo no; exit 1; fi
     ;;
-  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
+  *) echo "usage: entrypoint.sh {idle|surface-url URL|navigate URL|surface-html FILE|surface-memory FILE [where]|surface-split LOG HTML [TITLE]|surface-logterm LOG [TITLE]|surface-banner [MSG]|login [URL]|start [NAME]|stop|snapshot [OUT]|has-window}" >&2; exit 2 ;;
 esac

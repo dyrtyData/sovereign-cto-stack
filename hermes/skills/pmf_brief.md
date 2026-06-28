@@ -226,6 +226,7 @@ THIN: exactly **one** opportunity, **one** ticket, deterministic enough to verif
    |---|---|
    | `title` | **Must start with `[Product]`**, then the one-line opportunity, e.g. `[Product] PMF agent emits a brief but cannot rank opportunities by market size — add a TAM/SAM sizing step` |
    | `team` | `Global South Ai Safety` (or team id `132f84d7-56c2-40b8-b271-52f934307ff6`) |
+   | `project` | `sovereign-cto-stack` — **always set this** so the ticket lands in the project board, not loose in the backlog (`save_issue` resolves the name to id `d1335da7-fec7-4eee-95ef-d94dde85cde5`). |
    | `labels` | `["Product"]` — the `Product` label (already created in the workspace; `save_issue` resolves the name to its id). If for any reason the label cannot attach, KEEP the `[Product]` title prefix as the marker. |
    | `priority` | `2` (High) for a clear, demanded gap; `3` (Medium) otherwise. |
    | `description` | Markdown, the body shape below. Literal newlines, not escapes. |
@@ -247,6 +248,17 @@ THIN: exactly **one** opportunity, **one** ticket, deterministic enough to verif
       supports the opportunity. Cite the UNION — never pre-curate. The string
       `Grounded in:` MUST appear verbatim, at least one citing a real corpus `*.md`.
    6. **Acceptance criteria** — a short checklist so it is actionable as-is.
+   7. **Review (standing instruction — GLO-14 P2)** — end the body with the literal line so
+      whoever builds the capability runs a Greptile PR review before merge:
+
+      ```text
+      After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+      ```
+
+      Append it verbatim — the gate `scripts/assert_greptile_instruction.py` reads this line
+      back from both the live Linear ticket and the `tickets/<ID>.md` snapshot. The Greptile
+      CLI / `/greptile` command live globally in `~/.claude` (an out-of-repo prerequisite, not a
+      GLO-14 repo deliverable); this repo only carries the instruction line.
 
 5. **Confirm by reading the ticket back** (`list_issues(query="[Product]", team=...)`
    or `get_issue`): verify the `Product` label (or the `[Product]` title marker), a

@@ -1,22 +1,15 @@
-# GLO-14 — [Full-Build] Sovereign CTO Stack — next epic (GLO-13 P0–P4 shipped) + rolled-forward backlog
+[GLO-14] [Full-Build] Sovereign CTO Stack — next epic (GLO-13 P0–P4 shipped) + rolled-forward backlog
+Branch: humanlayer/glo-14-full-build-sovereign-cto-stack-next-epic-glo-13-p0p4-shipped
+Status: Backlog
 
-- **identifier:** GLO-14
-- **url:** https://linear.app/global-south-ai-safety/issue/GLO-14/full-build-sovereign-cto-stack-next-epic-glo-13-p0-p4-shipped-rolled
-- **team:** Global South Ai Safety
-- **status:** Backlog
-- **labels:** Full-Build
-- **priority:** High (2)
-- **snapshot captured:** 2026-06-28T20:02:53+00:00
-
-## Description
-
+Description:
 ## What this is
 
-The **next full-build epic** for the Sovereign CTO Stack — authored on the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> closeout
+The **next full-build epic** for the Sovereign CTO Stack — authored on the [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) closeout
 (Part D recurrence: "the final step is to author the next full-build epic", mirroring how Phase 5
-of the original build authored <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>). <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> captured the complete vision and its prioritized
+of the original build authored [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized)). [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) captured the complete vision and its prioritized
 backlog P0–P4; that backlog is now **built and gated** on-branch. This epic rolls forward whatever
-remains (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> Part C) and folds in the concrete items discovered while executing P0–P4, so git
+remains ([GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) Part C) and folds in the concrete items discovered while executing P0–P4, so git
 history stays the self-perpetuating, always-current roadmap.
 
 Public repo: [https://github.com/dyrtyData/sovereign-cto-stack](<https://github.com/dyrtyData/sovereign-cto-stack>) · decision record:
@@ -25,9 +18,9 @@ Public repo: [https://github.com/dyrtyData/sovereign-cto-stack](<https://github.
 
 ---
 
-## Part A — what <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> delivered (Phases 0–5 + the P0–P4 backlog, all gated)
+## Part A — what [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) delivered (Phases 0–5 + the P0–P4 backlog, all gated)
 
-<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> shipped the entire phased build as thin, gated, verifiable slices — recorded here so this
+[GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) shipped the entire phased build as thin, gated, verifiable slices — recorded here so this
 epic stands alone:
 
 ### Phase 0 — Public-safe repo skeleton + prerequisites gate
@@ -48,24 +41,24 @@ consulted before every CTO function, citing the union of returned source files.
 
 graphify static map; `service_topology.py` derives coupling (frontend=7, checkout=6); the
 `CTO-Architecture` profile multi-angle-grounds and files HumanLayer-ready `[Brownfield]` tickets
-(<issue id="9b8ed28f-a84c-406d-a141-fe8bd84e1d46" href="https://linear.app/global-south-ai-safety/issue/GLO-8/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-8</issue>/9/10/11, then <issue id="ef6ce1dd-6c47-4875-ac1e-234e7129154f" href="https://linear.app/global-south-ai-safety/issue/GLO-15/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend">GLO-15</issue>/<issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue> re-centered on the billing-path hub).
+([GLO-8](https://linear.app/global-south-ai-safety/issue/GLO-8/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend)/9/10/11, then [GLO-15](https://linear.app/global-south-ai-safety/issue/GLO-15/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend)/[GLO-16](https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6) re-centered on the billing-path hub).
 
 ### Phase 4 — PMF research profile + autonomous-run `.mp4` recording
 
 `CTO-Market` profile over the shared Kanban; `pmf_brief` skill → cited brief → one `[Product]`
-ticket (<issue id="43187d4c-dfc8-4755-8c0c-4efec4574a4a" href="https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous">GLO-12</issue>); Xvfb+ffmpeg recorder capturing a live split-screen.
+ticket ([GLO-12](https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous)); Xvfb+ffmpeg recorder capturing a live split-screen.
 
-### Phase 5 — Documentation finalization + the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> full-build epic
+### Phase 5 — Documentation finalization + the [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) full-build epic
 
 `setup-guide.md` / `system-design-tradeoffs.md` / `cto-functions.md`; ticket-tracking wired into
-the workflow; the comprehensive full-build ticket (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>).
+the workflow; the comprehensive full-build ticket ([GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized)).
 
-### The <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P0–P4 backlog (built + gated this pass — recap, for self-containment)
+### The [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) P0–P4 backlog (built + gated this pass — recap, for self-containment)
 
-The <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> prioritized deferred backlog shipped in order, each with an exit-0 gate:
+The [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) prioritized deferred backlog shipped in order, each with an exit-0 gate:
 
 * **P0 — Demo video authenticity** (`assert_demo_authenticity.py`): real `agent.tool_executor`
-  tool-call lines stream into the recorded run. (<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> promoted this from the original video-
+  tool-call lines stream into the recorded run. ([GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) promoted this from the original video-
   **authenticity** "someday" deferral to a P0 quick-win.)
 * **P1 — NemoClaw / OpenShell egress hardening** (`assert_egress_policy.py`): deny-by-default
   egress enforced by a real NVIDIA OpenShell sandbox loading `policy.yaml`; the load-bearing
@@ -74,12 +67,12 @@ The <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/gl
   cohorts ground the PMF brief's AARRR Revenue/Retention (vs assumptions).
 * **P3 — SonarQube** DETECT + **graphify (KEEP IT)** for cross-service coupling → **Hermes****
 ****(JUDGMENT)** → **Codegen** for novel fixes / **Moderne** for recipe-amenable debt
-  (`assert_sonar_fusion.py`): 240 real SonarQube issues fused onto `service-coupling.json`; <issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue>
-  cites a SonarQube issue + the billing-path coupling hub + Codegen. (<issue id="43187d4c-dfc8-4755-8c0c-4efec4574a4a" href="https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous">GLO-12</issue>, the PMF `[Product]`
+  (`assert_sonar_fusion.py`): 240 real SonarQube issues fused onto `service-coupling.json`; [GLO-16](https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6)
+  cites a SonarQube issue + the billing-path coupling hub + Codegen. ([GLO-12](https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous), the PMF `[Product]`
   ticket, independently proposed exactly this autonomous-remediation gap.)
 * **P4 — PMF** full version, **RICE/ICE**-ranked (`assert_pmf_ranked.py`): 3 ranked opportunities +
   a shipped-bet ledger + a prior-decisions consult (self-hosted mem0 + git) that does not
-  re-propose the already-decided <issue id="43187d4c-dfc8-4755-8c0c-4efec4574a4a" href="https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous">GLO-12</issue> bet.
+  re-propose the already-decided [GLO-12](https://linear.app/global-south-ai-safety/issue/GLO-12/product-tech-debt-auditor-stops-at-diagnosis-add-autonomous) bet.
 * **Closeout** — hybrid-montage showcase video (`assert_showcase_video.py`) + this next epic.
 
 ---
@@ -95,7 +88,7 @@ PMF, every CTO function) must **write each decision to the configured mem0** `me
 ****on every run** — passive, long-lived memory capture — so the system genuinely remembers what it
 decided and why across runs, not just re-seeds from the tracked `tickets/` snapshots. Git history
 stays authoritative (`policy.yaml` of the mind: mem0 is a complement, never a dependency), but the
-recall convenience must actually fill up. This is the user's explicitly-requested <issue id="26b9b2b4-03bc-4762-8a65-b32e16553218" href="https://linear.app/global-south-ai-safety/issue/GLO-14/full-build-sovereign-cto-stack-next-epic-glo-13-p0-p4-shipped-rolled">GLO-14</issue> item.
+recall convenience must actually fill up. This is the user's explicitly-requested [GLO-14](https://linear.app/global-south-ai-safety/issue/GLO-14/full-build-sovereign-cto-stack-next-epic-glo-13-p0-p4-shipped-rolled) item.
 **Rationale.** Today the loop *reads* prior decisions (seeded from `tickets/[Product]` + git) but
 never *writes* new ones, so the memory never grows. Closing the write path is the difference
 between a demo of memory and a system that learns. Highest priority — it is load-bearing for the
@@ -132,7 +125,7 @@ step rather than fragile session plumbing on the deadline.
 
 ### P4 — Host-orchestrator egress confinement via OpenShell's MicroVM driver (still NemoClaw, deeper)
 
-**Scope.** This DOES use NemoClaw/OpenShell — it is the SAME stack <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P1 shipped, switched to
+**Scope.** This DOES use NemoClaw/OpenShell — it is the SAME stack [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) P1 shipped, switched to
 OpenShell's **MicroVM compute driver** (libkrun + Apple Hypervisor.framework, OpenShell Option B)
 instead of the **container** driver. P1 (container driver) confines the **containerized sub-tools**
 (the sandbox demonstrably refuses a non-allow-listed CONNECT). P4 confines the **host Hermes****
@@ -146,12 +139,12 @@ load-bearing containerized layer that ships today (An Elegant Puzzle: sequence t
 
 ### P5 — PMF → product loop: real shipped-bet feedback (close the North Star loop)
 
-**Scope.** EXTENDS the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 PMF loop that already SHIPPED (it ranks opportunities RICE/ICE
+**Scope.** EXTENDS the [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) P4 PMF loop that already SHIPPED (it ranks opportunities RICE/ICE
 and records a `shipped` field in `recordings/pmf_ledger.json`) — but nothing flips
 `shipped:false → true` from real outcomes yet. Wire the actual feedback signal (a shipped bet's
 measured result) back into the ranking so the North Star — **opportunities shipped**, not tickets
 filed — is computed from reality, grounded in real usage + Stripe data.
-**Rationale.** Closes the learning loop the <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> P4 slice scaffolded; depends on accumulated
+**Rationale.** Closes the learning loop the [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) P4 slice scaffolded; depends on accumulated
 usage data, so it follows the memory-capture (P1) work.
 
 ### P6 — Moderne / OpenRewrite paid-tier evaluation (LOWEST priority — paid, no account yet)
@@ -159,7 +152,7 @@ usage data, so it follows the memory-capture (P1) work.
 **Scope.** Evaluate **Moderne / OpenRewrite** (no free tier — paid; no account provisioned yet, so
 deliberately last) as the deterministic, recipe-based mass-refactor back-end ALONGSIDE Codegen:
 Codegen for NOVEL, judgment-heavy fixes; Moderne for RECIPE-AMENABLE mechanical debt
-(dependency/framework upgrades, broad languages incl. Java, which Codegen does not cover). <issue id="fa4a8772-3428-459f-90c3-d5cd77cbbe11" href="https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6">GLO-16</issue>
+(dependency/framework upgrades, broad languages incl. Java, which Codegen does not cover). [GLO-16](https://linear.app/global-south-ai-safety/issue/GLO-16/brownfield-checkoutservice-billing-path-grpc-coupling-hub-degree-6)
 already routes its billing-path refactor to Codegen and explicitly defers the Moderne evaluation
 here. Register the Moderne local MCP (`mod config agent-tools install`) under
 `hermes/config.yaml mcp_servers` and pilot one recipe.
@@ -171,17 +164,17 @@ account yet, so it is a future evaluation/decision item — moved to the end of 
 
 ## Part C — rolled-forward original deferred items (with rationale)
 
-* **Full mem0 OSS server + Next.js dashboard** (from <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> Phase 1 / Part C). *Why still**
+* **Full mem0 OSS server + Next.js dashboard** (from [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) Phase 1 / Part C). *Why still**
 **deferred:* the SDK-on-host path verifies every phase; the dashboard is a visualization nicety.
   Now more relevant once P1 above makes the `memories` collection actually fill up — a dashboard
   over a growing memory is worth more than over an empty one.
-* **OpenHands via Portal/LiteLLM** (from <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> Part C). *Why:* the greenfield path stays "Hermes
+* **OpenHands via Portal/LiteLLM** (from [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) Part C). *Why:* the greenfield path stays "Hermes
   research → HumanLayer Linear ticket → Claude Code executes"; point OpenHands at the Portal
   OpenAI-compatible endpoint via LiteLLM to avoid a separate Anthropic key when picked up.
-* **Second-account "fresh setup" walkthrough** (from <issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue> Part C). *Why:* single-account /
+* **Second-account "fresh setup" walkthrough** (from [GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized) Part C). *Why:* single-account /
   multiple-profiles is what makes the shared Kanban work; two-account is future-only.
 
-*(*<issue id="41ce0a1f-c6c8-475d-a0b5-aebe8b17db81" href="https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized">GLO-13</issue>*'s demo-authenticity item was promoted to P0 and is now shipped; its real-Linear-UI ending**
+*(*[GLO-13](https://linear.app/global-south-ai-safety/issue/GLO-13/full-build-sovereign-cto-stack-complete-vision-all-phases-prioritized)*'s demo-authenticity item was promoted to P0 and is now shipped; its real-Linear-UI ending**
 **is rolled forward as P3 above.)*
 
 ---
@@ -197,28 +190,14 @@ executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on
 
 ## Acceptance criteria (for this full-build epic)
 
-- [x] mem0 `memories` collection ACCUMULATES — every agent run writes its decision; a fresh query
+- [ ] mem0 `memories` collection ACCUMULATES — every agent run writes its decision; a fresh query
       after N runs returns prior-run decisions that were never seeded from `tickets/`.
-      *(Done — P2: `mem0_record_decision.py` + `assert_memory_accumulates.py` exit 0; two runs grow
-      the count, run 2 recalls run 1, recalled text is absent from every `tickets/*.md`.)*
-- [x] Moderne/OpenRewrite CAPTURED with scope + rationale, the route-to-Codegen decision recorded in
-      `docs/system-design-tradeoffs.md`, and a deferred local-MCP stub staged in `hermes/config.yaml`.
-      *(Resolved Q11: no Moderne account is provisioned, so the paid-recipe pilot is **deferred to
-      Part C** rather than executed; remediation routes to Codegen "named-only". The OpenRewrite-OSS
-      pilot is preserved as the no-account option, rolled forward into the next epic.)*
-- [x] The recorded demo CAN end on the real Linear ticket UI (authenticated Chromium profile), with
+- [ ] Moderne/OpenRewrite evaluated: one recipe piloted, the route-to-Moderne decision recorded in
+      `docs/system-design-tradeoffs.md` with cost/benefit vs Codegen.
+- [ ] The recorded demo CAN end on the real Linear ticket UI (authenticated Chromium profile), with
       the local-snapshot HTML retained as the reproducible default.
-      *(Done — P3 / D-2: the authenticated GLO-19 Linear UI montage ending + the `file://` default;
-      `assert_showcase_video.py` + `assert_persistent_profile_wiring.py` exit 0.)*
-- [x] Host-orchestrator MicroVM confinement scoped (or built) with the macOS-bug tradeoffs recorded.
-      *(Done — P4: spiked to the driver-binds layer, dated NO-GO + the four macOS limitations
-      recorded in `docs/system-design-tradeoffs.md`; `assert_microvm_spike.py` exit 0.)*
-- [x] Each rolled-forward item states scope + rationale (done above + Part C of the tradeoffs doc).
-- [x] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
-      *(Done — Phase 7: `scripts/file_fullbuild_ticket.py --closeout-epic` files it and snapshots it.)*
+- [ ] Host-orchestrator MicroVM confinement scoped (or built) with the macOS-bug tradeoffs recorded.
+- [ ] Each rolled-forward item states scope + rationale (done above).
+- [ ] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
 
----
-
-## Review
-
-After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+View in Linear: https://linear.app/global-south-ai-safety/issue/GLO-14/full-build-sovereign-cto-stack-next-epic-glo-13-p0-p4-shipped-rolled

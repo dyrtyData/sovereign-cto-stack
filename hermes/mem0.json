@@ -1,5 +1,5 @@
 {
-  "_comment": "mem0 provider behavioral config (tracked reference). Hermes reads $HERMES_HOME/mem0.json. Primary mode is self-hosted OSS on pgvector (the docker-compose mem0-postgres service). Platform fallback: set MEM0_API_KEY in ~/.hermes/.env and switch mode to 'platform' (design Q6). Secrets are NEVER stored here.",
+  "_comment": "mem0 provider behavioral config (tracked reference). Hermes reads $HERMES_HOME/mem0.json. Primary mode is self-hosted OSS on pgvector (the docker-compose mem0-postgres service). Pinned to mem0 OSS >=2.0.0 (GLO-14 P1, design D-1): entity-linking is native to infer=True extraction — no external graph DB / no Neo4j, so there is NO graph_store key to configure or remove and this config loads unchanged under v2.0.0. Platform fallback: set MEM0_API_KEY in ~/.hermes/.env and switch mode to 'platform' (design Q6). Secrets are NEVER stored here.",
   "mode": "oss",
   "user_id": "sovereign-cto",
   "agent_id": "orchestrator",

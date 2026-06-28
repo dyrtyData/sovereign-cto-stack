@@ -18,11 +18,24 @@ capture, Moderne/OpenRewrite paid-tier eval, the real-Linear-UI demo ending, hos
 MicroVM confinement). GLO-14 also carries the `[Full-Build]` label and the full 5-phase + P1-P4
 structure, so `scripts/assert_fullbuild_ticket.py GLO-14` passes its nine structural checks.
 
+Closeout (GLO-14 Phase 7, design D-6 / Q11 / Q12): GLO-14's own backlog is now substantially
+actioned, so the `--closeout-epic` mode authors the epic *after* GLO-14 — the next full-build epic
+in the self-perpetuating Part-D recurrence. It rolls forward GLO-14's Part C deferrals
+(Moderne/OpenRewrite — no account, OSS-pilot preserved as an option; the mem0 OSS server + Next.js
+dashboard; OpenHands via Portal/LiteLLM; the second-account walkthrough; and the mem0
+passive-capture-via-proxy option) PLUS the items discovered while building GLO-14 P1–P5 (the
+live-profile skill-deploy step, the duplicate-finding dedupe need, and the Greptile global setup
+as an out-of-repo prerequisite). Linear assigns its id (the next free GLO-NN, after GLO-19); we
+snapshot whatever id `save_issue` returns. `scripts/assert_fullbuild_ticket.py <ID>` then asserts
+the rolled-forward items are present.
+
 Usage:
   python3 scripts/file_fullbuild_ticket.py                 # create/update GLO-13 (the [Full-Build] epic)
   python3 scripts/file_fullbuild_ticket.py GLO-13          # update that id in place
-  python3 scripts/file_fullbuild_ticket.py --next-epic     # author/update GLO-14 (the NEXT epic)
+  python3 scripts/file_fullbuild_ticket.py --next-epic     # author/update GLO-14 (the epic GLO-13 authored)
   python3 scripts/file_fullbuild_ticket.py --next-epic GLO-14
+  python3 scripts/file_fullbuild_ticket.py --closeout-epic # author the NEXT epic AFTER GLO-14 (Linear assigns the id)
+  python3 scripts/file_fullbuild_ticket.py --closeout-epic GLO-20
 """
 from __future__ import annotations
 
@@ -36,6 +49,16 @@ import linear_mcp as L  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TITLE = "[Full-Build] Sovereign CTO Stack — complete vision (all phases) + prioritized deferred backlog"
+
+# Standing review instruction appended to EVERY filed ticket body (GLO-14 P2 / design D-3/D-4).
+# The gate scripts/assert_greptile_instruction.py reads this exact line back from the live Linear
+# ticket AND the tickets/<ID>.md snapshot. The Greptile CLI/skill/`/greptile` command live globally
+# in ~/.claude (an out-of-repo prerequisite) — this repo only carries the instruction line.
+GREPTILE_INSTRUCTION = (
+    "After you open a PR for this ticket, run Greptile on it (/greptile) "
+    "and address the findings before requesting merge."
+)
+GREPTILE_REVIEW_SECTION = f"\n\n---\n\n## Review\n{GREPTILE_INSTRUCTION}\n"
 
 DESCRIPTION = r"""## What this is
 
@@ -427,6 +450,211 @@ executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on
 """
 
 
+CLOSEOUT_TITLE = (
+    "[Full-Build] Sovereign CTO Stack — next epic (GLO-14 learn/review/feedback shipped) "
+    "+ rolled-forward backlog"
+)
+
+CLOSEOUT_EPIC_DESCRIPTION = r"""## What this is
+
+The **next full-build epic** for the Sovereign CTO Stack — authored on the **GLO-14** closeout
+(Part D recurrence: "the final step is to author the next full-build epic", mirroring how GLO-13's
+Phase 5 authored GLO-14). GLO-14 made the system actually **learn and review**: it closed mem0's
+write path so `memories` accumulates run-over-run (P1), had every filed ticket prompt a Greptile PR
+review (P2), flipped the PMF North Star from a real Stripe-grounded outcome (P5), told a fuller
+authenticated demo (P3 / D-2), and spiked host-orchestrator MicroVM confinement (P4) — each behind
+an exit-0 `assert_*.py` gate. This epic rolls forward GLO-14's Part C deferrals and folds in the
+concrete items discovered while building P1–P5, so git history stays the self-perpetuating,
+always-current roadmap.
+
+Public repo: https://github.com/dyrtyData/sovereign-cto-stack · decision record:
+`docs/system-design-tradeoffs.md` · CTO-function map: `docs/cto-functions.md` · setup:
+`docs/setup-guide.md`. Git history is the authoritative decision record; mem0 is a complement.
+
+---
+
+## Part A — what GLO-14 delivered (the learn / review / feedback loops, all gated)
+
+GLO-14 shipped seven thin, gated, verifiable slices on top of GLO-13's phased build:
+
+- **P1 — mem0 OSS ≥ v2.0.0 upgrade** (`scripts/mem0_roundtrip.py`): pinned `mem0ai>=2.0.0`
+  (resolved 2.0.10); native entity-linking replaces external graph DBs (no Neo4j); the round-trip
+  smoke asserts the v2 return shape and self-skips the `infer=True` entity-link proof when Ollama
+  is absent.
+- **P2 — Close the mem0 write path** (`scripts/assert_memory_accumulates.py`): a deterministic
+  `mem0_record_decision.py` writes each filed decision into the unified `memories` collection with
+  `infer=True`, between ticket-filing and snapshot in **both** loops; the PMF consult reads the same
+  collection. Two runs both grow the count, run 2 recalls run 1, and the recalled text is absent
+  from every `tickets/*.md` (accumulated, not re-seeded).
+- **P3 — Greptile ticket-instruction line** (`scripts/assert_greptile_instruction.py`): every filed
+  ticket carries a standing "run Greptile on the PR" line; the gate reads it back from the live
+  ticket + the snapshot. The Greptile CLI / skill / `/greptile` command live **globally in
+  `~/.claude`, out of repo** (a project-agnostic prerequisite, not a repo deliverable).
+- **P5 — PMF shipped-bet flip** (`scripts/assert_shipped_flip.py`): a Stripe-grounded shipped-result
+  record flips the matching `pmf_ledger.json` row `false → true`; the recorded metric must equal a
+  real `stripe_metrics.json` value (no fabrication), unrelated rows untouched, atomic write.
+- **P3 / D-2 — Fuller demo + memory view + authenticated Linear ending**
+  (`scripts/assert_showcase_video.py`, `render_memory_card.py`, `assert_memory_view_grows.py`): the
+  montage surfaces more components and can end on the **real** authenticated Linear ticket UI
+  (persistent Chromium profile), with the `file://` snapshot as the reproducible default; a
+  read-only memory view proves `memories` grows.
+- **P4 — Host-orchestrator MicroVM confinement spike** (`scripts/assert_microvm_spike.py`): the
+  OpenShell `vm` driver (libkrun + Apple Hypervisor.framework) was spiked to the driver-binds layer
+  and a dated **NO-GO** go/no-go recorded with the four macOS limitations (Q9 Option A: scoped, not
+  built).
+- **Closeout** — Part C deferral capture + this next epic (`scripts/assert_closeout_ready.py` gates
+  the D-6 boundary: every prior gate exit-0 + the GLO-14 acceptance checklist fully ticked).
+
+---
+
+## Part B — rolled-forward + newly-discovered backlog (build in this order)
+
+### P1 — mem0 OSS server + read-only Next.js memory dashboard (rolled forward — now worth building)
+**Scope.** GLO-14 built a *lightweight static* read-only memory view (`render_memory_card.py`) that
+proves the `memories` collection grows. Roll forward the **full mem0 OSS server + a small Next.js
+read-only dashboard** over the now-accumulating collection — entity links, per-run decision rows,
+search — as the standing visualization surface (no frontend exists in the repo yet).
+**Rationale.** Deferred in GLO-14 (Q12) because the static card verifies the phase and no frontend
+scaffolding exists; now that P1/P2 made `memories` actually fill up, a dashboard over a growing
+memory is worth materially more than over an empty one. Read-only — mem0 stays a recall complement,
+git stays authoritative.
+
+### P2 — Moderne / OpenRewrite remediation back-end (rolled forward — needs an account OR the OSS pilot)
+**Scope.** Evaluate **Moderne / OpenRewrite** as the deterministic, recipe-based mass-refactor
+back-end ALONGSIDE Codegen: Codegen for NOVEL, judgment-heavy fixes; Moderne for RECIPE-AMENABLE
+mechanical debt (dependency/framework upgrades, broad languages incl. Java, which Codegen does not
+cover). Two paths: (a) provision a Moderne account and register the local MCP
+(`mod config agent-tools install`) under `hermes/config.yaml mcp_servers` — the **commented stub is
+already staged** in that file (deferred, not registered); or (b) pilot **OpenRewrite OSS** directly
+(no account) on one recipe-amenable change and record the route-to-Moderne decision with cost/benefit
+vs Codegen in `docs/system-design-tradeoffs.md`.
+**Rationale.** GLO-14 moved this from an active backlog item to a Part C deferral (Q11) because no
+Moderne account is provisioned; remediation continues to route to Codegen ("named-only"). The
+OpenRewrite-OSS-pilot option is preserved so a recipe can be piloted without a paid account when the
+decision is made — the Hermes JUDGMENT layer should route each ticket to the right back-end.
+
+### P3 — Autonomous PR-review TRIAGE loop (rolled forward, deeper than GLO-14 P2)
+**Scope.** GLO-14 P2 deliberately decoupled Greptile to a *global, out-of-repo* skill that
+HumanLayer-on-Claude-Code runs on the PR (the only in-repo deliverable being the ticket-instruction
+line). The deeper, in-repo version — captured but **not** built in GLO-14 — is to **ingest Greptile's
+findings back into Hermes** and triage them: ground each via `query_cto_knowledge` and file
+`[Brownfield]` follow-ups / Kanban cards rather than leaving raw inline comments. Keep egress
+deny-by-default (any Greptile/GitHub endpoint joins `egress/policy.yaml`).
+**Rationale.** Turns "agents that ship + review" into "agents that ship, review, *and re-prioritize
+from the review*" — the triage/grounding step is the sovereign-CTO white space. Deferred in GLO-14
+in favour of the clean global-skill decoupling; rolled forward as the next autonomy increment.
+
+### P4 — mem0 passive capture via its OpenAI-compatible proxy (rolled forward — considered + rejected for now)
+**Scope.** GLO-14's Q3 probe confirmed the closed-source `hermes-agent` binary does **not** write
+`memories` natively, so the deterministic `mem0_record_decision.py` writer is load-bearing. The only
+"passive, as-intended" route is to chain inference through mem0's OpenAI-compatible proxy
+(`mem0.proxy.main.Mem0 → hermes proxy :8645 → Nous`), with mem0 silently `add()`-ing every turn.
+Evaluate adopting it deliberately if the tradeoff ever becomes worth it.
+**Rationale.** Rejected for GLO-14 because it places mem0 **in the critical inference hot path** (a
+mem0 outage breaks every agent call) and captures noisy raw turns instead of curated, tagged,
+gate-able decisions — violating the standing rule that mem0 is a recall complement, never
+load-bearing (git stays authoritative). The exact enablement path is recorded in
+`docs/system-design-tradeoffs.md` so a future epic can adopt it on purpose.
+
+### P5 — Host-orchestrator MicroVM confinement: BUILD the deferred remainder (rolled forward from GLO-14 P4)
+**Scope.** GLO-14 P4 spiked the OpenShell `vm` driver to the **driver-binds** layer and recorded a
+dated **NO-GO** for a default build (Q9 Option A). Build the deferred remainder once the fragile
+surface is de-risked: gateway reconfigure to `OPENSHELL_DRIVERS=vm`, a guest bootstrap image +
+guest-TLS, run the host orchestrator end-to-end inside the MicroVM, and clear the four documented
+macOS limitations (Landlock `best_effort` no-op on XNU, mDNS `.local` non-traversal, no CUDA,
+case-sensitive-APFS virtio-fs).
+**Rationale.** Strongest confinement (confines the host "brain" itself), biggest moving-parts / DNS
+risk — sequenced late, after the spike cleared the cheapest risk (does the driver boot? yes).
+
+### P6 — OpenHands via Portal/LiteLLM + the second-account "fresh setup" walkthrough (rolled forward)
+**Scope.** (a) **OpenHands** autonomous greenfield prototyping, pointed at the Nous Portal
+OpenAI-compatible endpoint via **LiteLLM** (`LLM_MODEL` / `LLM_API_KEY` / `LLM_BASE_URL`) to avoid a
+separate Anthropic key (Claude Code Max OAuth tokens are blocked in third-party tools). (b) A
+**second-account fresh-setup walkthrough** documenting a two-account topology.
+**Rationale.** The greenfield path stays "Hermes research → HumanLayer Linear ticket → Claude Code
+executes" for now; the single-account / multiple-profiles topology is what makes the shared Kanban
+board work (Hermes has no cross-account coordination primitive). Both are future-only, hence last.
+
+---
+
+## Part C — rolled-forward original deferred items + GLO-14 discoveries (with rationale)
+
+- **Greptile global setup (out-of-repo prerequisite).** *Why out of repo:* the Greptile CLI + Claude
+  Code skill + `/greptile` command are set up **globally in `~/.claude`** (project-agnostic; a
+  separate task — `greptile login` once, install/adapt `github.com/greptileai/skills`). This repo's
+  sole Greptile surface is the ticket-instruction line; the global setup is a prerequisite, not a
+  GLO-14/next-epic repo deliverable. Recorded so a fresh clone knows the dependency.
+- **Live-profile skill-deploy step (discovered building GLO-14 P3).** *Why:* the Greptile
+  instruction line lives in the tracked `hermes/skills/*.md`, but Hermes reads from the live
+  `~/.hermes` profile dirs — so a deploy step that syncs the tracked skills into each live profile is
+  required for the instruction to actually fire. Capture it as a documented setup step / small script.
+- **Duplicate-finding dedupe (discovered building GLO-14).** *Why:* re-filing `[Brownfield]` tickets
+  produced duplicate issues (GLO-8/9/10/11 → re-centered GLO-15/16); a dedupe step that detects and
+  consolidates near-duplicate filed tickets keeps the tracker and `tickets/` snapshots clean.
+- **Full mem0 OSS server + Next.js dashboard** (promoted to P1 above). *Why now:* see P1 rationale —
+  worth building once the collection accumulates.
+- **mem0 passive capture via the proxy** (promoted to P4 above). *Why still deferred:* see P4 —
+  keeps mem0 off the critical inference hot path.
+- **OpenHands via Portal/LiteLLM** + the **second-account walkthrough** (promoted to P6 above).
+  *Why:* future-only, see P6 rationale.
+- **Moderne/OpenRewrite** (promoted to P2 above; OSS-pilot option preserved). *Why:* see P2 — no
+  account provisioned; the OSS pilot is the no-account path.
+
+---
+
+## Part D — closeout: author the NEXT full-build epic (recurring)
+
+When this epic's backlog is substantially actioned — or at the next planning boundary — author the
+**next** full-build epic, rolling forward whatever remains, folding in items discovered while
+executing this backlog, and re-prioritizing. Snapshot it to `tickets/<ID>.md` on filing
+(AGENTS.md rule 7). Self-perpetuating roadmap; git history is the authoritative record.
+
+---
+
+## Acceptance criteria (for this full-build epic)
+- [ ] A read-only mem0 dashboard (or the full OSS server + Next.js view) renders the now-accumulating
+      `memories` collection (entity links + per-run decisions).
+- [ ] Moderne/OpenRewrite is either account-provisioned + MCP-registered, or one OSS recipe is
+      piloted, with the route-to-Moderne decision recorded vs Codegen in
+      `docs/system-design-tradeoffs.md`.
+- [ ] Greptile findings are ingested back into Hermes and triaged into grounded follow-ups (the
+      deeper in-repo PR-review loop), with egress deny-by-default preserved.
+- [ ] Host-orchestrator MicroVM confinement is BUILT (the GLO-14 spike's deferred remainder) or the
+      go/no-go is re-confirmed with updated evidence.
+- [ ] Each rolled-forward item states scope + rationale (done above), incl. the Greptile global
+      prerequisite, the live-profile skill-deploy step, and the duplicate-finding dedupe need.
+- [ ] Every Hermes-filed ticket is associated with the **`sovereign-cto-stack` Linear project**
+      (not loose in the backlog) — `save_issue` sets `project` in both the scripts and the filing
+      skills.
+- [ ] **After everything is complete:** hard-copy this task's HumanLayer artifacts
+      (`.humanlayer/tasks/<task>/*.md` — research questions, research, design discussion, structure
+      outline, ticket) into **`docs/task-artifacts/<task>/`**, scrubbed of any secrets and **NOT**
+      gitignored, and commit (to `main` once merged). This makes them visible to repomix / gitingest
+      (which skip gitignored paths) so the whole decision trail flattens into context. Standing
+      recurrence for every epic in this repo.
+- [ ] On closeout, the NEXT full-build epic is authored (Part D) and snapshotted into `tickets/`.
+"""
+
+
+def find_closeout_epic() -> str | None:
+    """Find the GLO-14-closeout-authored next epic by its distinctive title prefix.
+
+    The fuzzy "Full-Build" search can lag the index for a just-filed ticket, so also scan the
+    recent createdAt list — this keeps re-runs idempotent (update in place, never re-file).
+    """
+    prefix = "[Full-Build] Sovereign CTO Stack — next epic (GLO-14"
+    for params in (
+        {"query": "Full-Build", "team": L.TEAM, "limit": 50},
+        {"team": L.TEAM, "limit": 50, "orderBy": "createdAt"},
+    ):
+        res = L.tool("list_issues", params)
+        issues = res.get("issues", res) if isinstance(res, dict) else res
+        for i in issues or []:
+            if str(i.get("title", "")).startswith(prefix):
+                return i.get("id") or i.get("identifier")
+    return None
+
+
 def find_existing(prefix_title: str = "[Full-Build] Sovereign CTO Stack — complete vision") -> str | None:
     """Find the ORIGINAL GLO-13 full-build epic (by its specific title prefix).
 
@@ -455,18 +683,30 @@ def find_next_epic() -> str | None:
 def main(argv: list[str]) -> int:
     L.init()
 
-    # `--next-epic` authors GLO-14 (the next full-build epic, Part D recurrence);
-    # any remaining positional arg is the id to update in place. Default mode
-    # files/updates the original GLO-13 [Full-Build] epic.
+    # `--next-epic` authors GLO-14 (the epic GLO-13's closeout authored); `--closeout-epic`
+    # authors the epic AFTER GLO-14 (the GLO-14 closeout recurrence — Linear assigns the id);
+    # any remaining positional arg is the id to update in place. Default mode files/updates the
+    # original GLO-13 [Full-Build] epic.
     next_epic = False
+    closeout_epic = False
     rest: list[str] = []
     for a in argv:
         if a in ("--next-epic", "--next"):
             next_epic = True
+        elif a in ("--closeout-epic", "--closeout"):
+            closeout_epic = True
         else:
             rest.append(a)
 
-    if next_epic:
+    if closeout_epic:
+        title, description = CLOSEOUT_TITLE, CLOSEOUT_EPIC_DESCRIPTION
+        # No fixed slot: this epic gets the next free GLO-NN Linear assigns (after GLO-19).
+        # Update in place only if explicitly given an id (positional / env) or if a prior run
+        # already filed it (matched by its distinctive title prefix). NEVER reuse the GLO-14 slot.
+        issue_id = (rest[0] if rest else None) or os.environ.get("CLOSEOUT_EPIC_ID") \
+            or find_closeout_epic()
+        what = "closeout-epic"
+    elif next_epic:
         title, description = NEXT_TITLE, NEXT_EPIC_DESCRIPTION
         issue_id = (rest[0] if rest else None) or os.environ.get("NEXT_EPIC_ID") or find_next_epic()
         # Reuse the GLO-14 slot if it currently holds a superseded Brownfield
@@ -481,9 +721,15 @@ def main(argv: list[str]) -> int:
         issue_id = (rest[0] if rest else None) or os.environ.get("FULLBUILD_ID") or find_existing()
         what = "full-build"
 
+    # Every filed ticket carries the standing Greptile review instruction (GLO-14 P2). Append
+    # it idempotently so re-filing in place doesn't stack duplicate sections.
+    if GREPTILE_INSTRUCTION not in description:
+        description = description.rstrip() + GREPTILE_REVIEW_SECTION
+
     args = {
         "title": title,
         "team": L.TEAM,
+        "project": L.PROJECT,
         "labels": ["Full-Build"],
         "priority": 2,
         "description": description,

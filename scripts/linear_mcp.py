@@ -25,6 +25,10 @@ from pathlib import Path
 
 URL = os.environ.get("LINEAR_MCP_URL", "https://mcp.linear.app/mcp")
 TEAM = os.environ.get("LINEAR_TEAM", "Global South Ai Safety")
+# Linear project every Hermes-filed ticket belongs to, so issues land in the
+# project board instead of loose in the backlog. save_issue resolves the name to an
+# id (project id d1335da7-fec7-4eee-95ef-d94dde85cde5). Override via $LINEAR_PROJECT.
+PROJECT = os.environ.get("LINEAR_PROJECT", "sovereign-cto-stack")
 
 _TOKEN_PATHS = [
     Path.home() / ".hermes/profiles/cto-architecture/mcp-tokens/linear.json",

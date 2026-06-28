@@ -81,10 +81,21 @@ instead of web-scraped competitor pricing. `scripts/assert_stripe_grounding.py` 
 **P4 ranking (built — the full PMF loop).** The loop now emits **multiple opportunities ranked
 RICE/ICE** (`recordings/pmf_ledger.json`), each grounded in the corpus + Stripe, with a `shipped`
 feedback field (North Star: opportunities shipped). Before ranking it **consults prior decisions**
-— self-hosted mem0 (pgvector) seeded from the tracked `tickets/[Product]` snapshots + the `git log`
-of `tickets/` — so it does not re-propose an already-decided bet (it correctly drops the GLO-12
+— self-hosted mem0 (pgvector), the unified **`memories`** collection that now carries both the
+idempotent seed of the tracked `tickets/[Product]` snapshots **and** the decisions the agent loops
+accumulate each run (GLO-14 P2 closed the write path + repointed this read), plus the `git log` of
+`tickets/` — so it does not re-propose an already-decided bet (it correctly drops the GLO-12
 autonomous-remediation idea). `scripts/assert_pmf_ranked.py` gates ≥2 scored, ranked, grounded
 opportunities + a non-empty "Prior decisions consulted" section.
+
+**GLO-14 P5 — the North Star loop now CLOSES (Stripe-grounded shipped flip).** The `shipped`
+field is no longer write-once-`false`: a recorded, **Stripe-grounded** shipped-result flips a
+ledger row `false → true` via the deterministic joiner `scripts/pmf_shipped_results.py`
+(`flip_shipped(...)`, atomic/additive). "Shipped" therefore means a *measured* outcome — the
+recorded metric must equal a real value in `recordings/stripe_metrics.json` or the flip is
+refused — so the North Star (`opportunities_shipped`) is grounded in real Stripe data, not a
+hand-set flag. Each flip is recorded into the unified `memories` collection as its own decision.
+`scripts/assert_shipped_flip.py` gates it on an isolated ledger copy.
 
 **Grounding dimensions → texts:**
 

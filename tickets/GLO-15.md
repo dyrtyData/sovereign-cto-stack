@@ -3,10 +3,10 @@
 - **identifier:** GLO-15
 - **url:** https://linear.app/global-south-ai-safety/issue/GLO-15/brownfield-frontend-is-a-7-service-grpc-coupling-hub-extract-a-backend
 - **team:** Global South Ai Safety
-- **status:** Backlog
+- **status:** Canceled
 - **labels:** Brownfield
 - **priority:** High (2)
-- **snapshot captured:** 2026-06-27T23:35:23+00:00
+- **snapshot captured:** 2026-06-28T21:26:36+00:00
 
 ## Description
 
@@ -44,3 +44,7 @@ Grounded in: lean-enterprise.md (IT performance measured by throughput and stabi
 - [ ] `protos/demo.proto` split per bounded context (no single all-service contract).
 - [ ] No service imports another service's protobuf stubs directly — all inter-service communication through well-defined service-specific contracts.
 - [ ] `frontend`'s efferent coupling reduced from 7 to ≤ 3 well-defined BFF contracts.
+
+## Review
+
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.

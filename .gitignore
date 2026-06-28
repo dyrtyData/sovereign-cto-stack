@@ -21,6 +21,13 @@ graphify-out/
 recordings/
 workspaces/
 
+# === Recorder persistent Chromium profile (GLO-14 P3 authenticated live-Linear ending) ===
+# A bind-mounted, PERSISTENT, AUTHENTICATED Chromium profile lets the OPTIONAL
+# TICKET_LIVE_URL=1 ending render the real logged-in Linear ticket. It holds a live
+# session (cookies/tokens) — NEVER commit it (AGENTS.md rule 3/8). The default
+# file:// snapshot ending needs no profile, so a clean clone has nothing here.
+recorder-profile/
+
 # === Corpus: converted copyrighted textbooks stay LOCAL ===
 # Conversion scripts are tracked; their Markdown output is not (review decision).
 corpus/

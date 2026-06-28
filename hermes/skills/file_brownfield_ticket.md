@@ -76,6 +76,7 @@ the human-readable forms of GraphQL's `teamId`/`labelIds`):
 |---|---|
 | `title` | **Must start with `[Brownfield]`**, then a one-line finding, e.g. `[Brownfield] frontend is a 7-service gRPC coupling hub — extract a backend-for-frontend boundary` |
 | `team` | `Global South Ai Safety` (the workspace's team; also accepts the team ID `132f84d7-56c2-40b8-b271-52f934307ff6`) |
+| `project` | `sovereign-cto-stack` — **always set this** so the ticket lands in the project board, not loose in the backlog. `save_issue` resolves the project name to its id (`d1335da7-fec7-4eee-95ef-d94dde85cde5`). |
 | `labels` | `["Brownfield"]` — attaches the `Brownfield` label (already created in the workspace). `save_issue` resolves label names to IDs. |
 | `priority` | `2` (High) for a coupling hub; `3` (Medium) otherwise. (0=None,1=Urgent,2=High,3=Medium,4=Low) |
 | `description` | Markdown, the body shape below. Use literal newlines, not escapes. |
@@ -116,6 +117,17 @@ The description MUST contain, in order:
    retrieval decide which texts are relevant. The string `Grounded in:` MUST appear
    verbatim, once per cited source.
 7. **Acceptance criteria** — a short checklist so it is actionable as-is.
+8. **Review (standing instruction — GLO-14 P2).** End the body with the literal standing
+   instruction line so whoever picks the ticket up runs a Greptile PR review before merge:
+
+   ```text
+   After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
+   ```
+
+   Append it verbatim (the gate `scripts/assert_greptile_instruction.py` reads this line back
+   from both the live Linear ticket and the `tickets/<ID>.md` snapshot). The Greptile CLI /
+   Claude Code skill / `/greptile` command live globally in `~/.claude` (an out-of-repo
+   prerequisite, not a GLO-14 repo deliverable); this repo only carries the instruction line.
 
 ### Template
 
@@ -177,6 +189,9 @@ throughput and deployment performance).
 - [ ] BFF/anti-corruption seam introduced in `src/frontend/` isolating the 7 clients.
 - [ ] `protos/demo.proto` split per bounded context (no single all-service contract).
 - [ ] No service imports another service's stubs directly.
+
+## Review
+After you open a PR for this ticket, run Greptile on it (/greptile) and address the findings before requesting merge.
 ```
 
 ## After filing

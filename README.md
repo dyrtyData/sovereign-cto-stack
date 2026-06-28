@@ -61,9 +61,72 @@ and is verifiable before the next begins.
 - **Closeout** — hybrid-montage **showcase video** (`assert_showcase_video.py`) + the next
   full-build epic (**GLO-14**) authored and snapshotted.
 
-The next epic (**GLO-14**) rolls forward: passive long-lived mem0 capture, an autonomous
-PR→Hermes→Greptile review loop, a real-Linear-UI demo ending, host-orchestrator MicroVM
-confinement, real shipped-bet feedback, and a Moderne paid-tier evaluation.
+**GLO-14 (the system learns and reviews — P1–P5 shipped, closed out):**
+
+- **P1** — mem0 OSS pinned to **`mem0ai[nlp]>=2.0.0`** (native entity-linking, no Neo4j; spaCy
+  lemmatized lexical index), gated by the extended round-trip — `mem0_roundtrip.py`.
+- **P2** — **Close the mem0 write path:** both agent loops now record the just-filed decision into
+  the unified **`memories`** collection (`mem0_record_decision.py`, `infer=True`) at the canonical
+  "after `save_issue`, before snapshot" position, so memory genuinely **accumulates run-over-run**;
+  the PMF consult reads the same collection. Gated by `assert_memory_accumulates.py` (two runs grow
+  the count, run 2 recalls run 1, and the recall is **not** re-seeded from `tickets/`); the
+  non-gating `diagnose_hermes_mem0_write.py` probes whether the Hermes binary writes mem0 natively.
+- **P3** — **Greptile PR review as a standing ticket instruction:** every filed ticket body now ends
+  with a standing line — _"After you open a PR for this ticket, run Greptile on it (/greptile) and
+  address the findings before requesting merge."_ Fully decoupled (design D-3/D-4): the only in-repo
+  deliverable is that line + the gate `assert_greptile_instruction.py` (reads it back from BOTH the
+  live Linear ticket and the `tickets/<ID>.md` snapshot). No in-repo Greptile code/MCP/webhook — the
+  CLI / `/greptile` command live globally in `~/.claude`, outside this repo.
+- **P5** — **Close the PMF North Star loop:** a recorded, **Stripe-grounded** shipped-result flips a
+  `pmf_ledger.json` row `shipped: false → true` so "shipped" means a *measured* outcome
+  (`pmf_shipped_results.py` — a deterministic, atomic joiner; design D-5 Option C). The flip is
+  refused unless the recorded metric value equals a real value in `recordings/stripe_metrics.json`
+  (no fabricated outcome), and each flip is recorded into `memories` as its own decision (depends on
+  P2). Gated by `assert_shipped_flip.py` (flips a known bet on an isolated temp copy, cross-reads the
+  metric against real Stripe data, and proves unrelated rows stay false — the real ledger untouched).
+
+- **Demo (D-2)** — **Fuller multi-component montage + read-only memory view + optional authenticated
+  Linear ending.** `build_showcase_video.py`'s catalogue now carries the D-2 segment story (the
+  visual hero loop + Stripe/egress/PMF data surfaces + four always-rendered title-carded chapters:
+  the **mem0 memory view**, the **Kanban** create→claim→complete lifecycle, the **Greptile** PR-review
+  instruction, and the **Linear ticket ending**); `assert_showcase_video.py` raises the manifest
+  minima to require those D-2 segments. A new read-only **`render_memory_card.py`** renders the
+  `memories` rows + mem0-native entity links to a self-contained `file://` HTML (the marked.js card
+  pattern), and **`assert_memory_view_grows.py`** scripts the "visibly more rows after a loop" claim.
+  The recorded demo's **default ending stays the reproducible `file://` ticket snapshot** (no auth);
+  an **optional** authenticated ending (`TICKET_LIVE_URL=1` + a mounted, gitignored persistent
+  Chromium profile — `recorder-profile/`) ends on the **real** logged-in Linear ticket UI. The
+  persistent-profile **wiring** is gated by `assert_persistent_profile_wiring.py` (asserts the recorder
+  launches Chromium WITH `--user-data-dir`), independent of any real Linear session.
+
+- **P4** — **Host-orchestrator MicroVM confinement spike (scoped, not built — design Q9 Option A).**
+  The host Hermes orchestrator runs *outside* any sandbox today (the GLO-13 egress slice only confines
+  containerized sub-tools). `scripts/microvm_spike.sh` stands up OpenShell's opt-in `vm` compute driver
+  (libkrun + Apple Hypervisor.framework) far enough to record a dated **go/no-go**, capturing the
+  evidence to `recordings/microvm_spike_<ts>.log` and the four macOS limitations (Landlock `best_effort`
+  no-op on XNU, mDNS `.local` non-traversal, no CUDA, case-sensitive-APFS virtio-fs) into
+  `docs/system-design-tradeoffs.md`. It degrades gracefully (always exit 0, no sudo, never disturbs the
+  running egress gateway). Gated by `assert_microvm_spike.py` (tolerant: asserts the log + dated go/no-go
+  exist, and runs the per-bug probes only when a future spike boots an in-guest workload — each probe
+  self-skips otherwise). The spike found the `vm` driver **boots** on this host (it binds
+  Hypervisor.framework); the **go/no-go is NO-GO** for a default build this epic — the fragile remainder
+  (gateway reconfigure + guest bootstrap + virtio-fs sharing) is deferred. Acceptance #4 = "scoped".
+
+- **Closeout (Phase 7 — Part C / D, design D-6 / Q11 / Q12).** The D-6 boundary is gated by
+  `scripts/assert_closeout_ready.py`: it runs **every** prior-phase gate (`assert_memory_accumulates`,
+  `assert_greptile_instruction`, `assert_shipped_flip`, `assert_showcase_video`, `assert_microvm_spike`)
+  and requires all exit-0, **and** asserts the GLO-14 acceptance checklist in `tickets/GLO-14.md` is
+  fully ticked — so "substantially actioned" is measured, not asserted by feel. The **Part C deferrals**
+  are captured with scope + rationale in `docs/system-design-tradeoffs.md`: **Moderne/OpenRewrite**
+  (Q11 — no account, so deferred; a **commented `moderne` stub** is staged in `hermes/config.yaml`,
+  not registered; the OpenRewrite-OSS pilot is preserved as the no-account option; remediation stays
+  Codegen "named-only"), the **mem0 OSS server + Next.js dashboard** (Q12), **OpenHands via
+  Portal/LiteLLM**, the **second-account walkthrough**, and the **mem0 passive-capture-via-proxy**
+  option. Then the **next full-build epic** is authored (`scripts/file_fullbuild_ticket.py
+  --closeout-epic`, Linear assigns the id after GLO-19) rolling those forward plus the GLO-14
+  discoveries (the Greptile global out-of-repo prerequisite, the live-profile skill-deploy step, the
+  duplicate-finding dedupe need) and snapshotted to `tickets/` (rule 7); `assert_fullbuild_ticket.py
+  --next-epic` asserts the rolled-forward items + the snapshot.
 
 ## Quick start
 
@@ -97,6 +160,12 @@ Complete every item before running later phases.
       can satisfy this). (Phase 4.)
 - [ ] *(Optional, future)* **mem0 Platform key** — `MEM0_API_KEY` in `.env` enables the cloud
       fallback for self-hosted pgvector memory.
+- [ ] *(Optional, GLO-14 P3)* **Authenticated Linear demo ending** — the recorded demo ends on the
+      reproducible `file://` ticket snapshot by **default** (no setup). To instead end on the **real**
+      logged-in Linear ticket UI, populate the gitignored persistent Chromium profile once
+      (`chromium --user-data-dir=$PWD/recorder-profile` → log in to Linear), then record with
+      `TICKET_LIVE_URL=1`. :warning: **Needs your click** — and the profile holds a live session, so it
+      is **never committed** (`recorder-profile/` is gitignored).
 
 ## Repository layout
 
@@ -112,7 +181,12 @@ Complete every item before running later phases.
 │   ├── assert_*.py           # per-slice exit-0-on-pass gates (egress / stripe / sonar / pmf / showcase / …)
 │   ├── stripe_client.py / stripe_seed.py        # real Stripe test-mode metrics
 │   ├── sonarqube_client.py / fuse_signals.py    # SonarQube DETECT + graphify fusion
-│   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket cards
+│   ├── build_showcase_video.py / render_*.py    # hybrid-montage showcase video + title/ticket/memory cards
+│   ├── render_memory_card.py                     # read-only mem0 `memories` view (file:// HTML, marked.js)
+│   ├── assert_memory_view_grows.py / assert_persistent_profile_wiring.py  # GLO-14 P3 demo gates
+│   ├── microvm_spike.sh / assert_microvm_spike.py  # GLO-14 P4 host-MicroVM confinement spike + tolerant gate
+│   ├── file_fullbuild_ticket.py / assert_fullbuild_ticket.py  # author + verify the [Full-Build] epic (--closeout-epic / --next-epic)
+│   ├── assert_closeout_ready.py                     # GLO-14 P7 D-6 boundary: all prior gates exit-0 + GLO-14 checklist ticked
 │   └── file_fullbuild_ticket.py / snapshot_tickets.py  # author + snapshot the full-build epic
 ├── docs/
 │   ├── setup-guide.md         # repeatable setup (full clean-clone walkthrough)
