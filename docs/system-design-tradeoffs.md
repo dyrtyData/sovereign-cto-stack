@@ -584,6 +584,25 @@ warning is **gone**; persisted rows carry a populated `text_lemmatized` (e.g. `c
 > one for a step that must happen every run. Git history stays the authoritative decision record;
 > mem0 is the recall complement that must never become load-bearing for correctness._
 
+**Recorded alternative considered and rejected — mem0 passive capture via its OpenAI-compatible
+proxy.** The Q3 probe proved the `hermes-agent` binary does not write `memories` natively, which
+raises the obvious question: *could we get passive, "as-intended" capture by routing inference
+through mem0?* Technically **yes** — mem0's only passive mode is its OpenAI-compatible proxy
+(`mem0.proxy.main.Mem0`), which auto-`add()`s every turn **when, and only when, the LLM call flows
+through mem0 itself**. Today `hermes -p` talks straight to the Nous remote API (provider `nous`,
+OAuth), so mem0 is never in that path. To enable passive capture you would **chain the inference
+path**: `hermes-agent → mem0 proxy → hermes proxy (:8645, OAuth→Nous)` — point Hermes' provider at
+mem0's proxy as an OpenAI-compatible `base_url`, and mem0 forwards to the local `:8645` shim (which
+already performs the OAuth translation) while silently capturing each turn. **We reject this for
+GLO-14** because it places mem0 **in the critical inference hot path**: a mem0 outage would break
+every agent call, and it captures raw conversational turns (noisy, untagged) instead of curated,
+metadata-tagged, gate-able decisions — directly violating the standing rule that *mem0 is a recall
+complement, never load-bearing for correctness* (AGENTS.md rule 2; git stays authoritative). The
+deterministic `mem0_record_decision.py` writer gives strictly better control for our purpose. The
+option is **rolled forward to Part C** below (and into the next epic's ticket) as a documented,
+deliberately-deferred path — *here is exactly how to enable it if a future epic ever wants
+passive capture*, with the load-bearing tradeoff stated up front.
+
 ## Deferred / future work — and *why* each was deferred (tracked in the full-build ticket)
 
 These are intentional deferrals, not omissions. Each is captured as a prioritized section of the
@@ -613,6 +632,16 @@ rationale below is the interview-ready "why now / why not now" for each.
 - **Full mem0 OSS server + Next.js dashboard.** *Deferred because:* Phase 1 uses the mem0
   SDK-on-host against pgvector — minimal moving parts on the critical path; the dashboard is not
   required to verify any phase, and the M3 can add it later resource-wise.
+- **mem0 passive capture via its OpenAI-compatible proxy (GLO-14 Q3 follow-on).** *Deferred —
+  considered and rejected for now.* The Q3 probe confirmed the Hermes binary does not write
+  `memories` natively, so the only route to "passive, as-intended" capture is to chain inference
+  through mem0's proxy: `hermes-agent → mem0 proxy (mem0.proxy.main.Mem0) → hermes proxy (:8645,
+  OAuth→Nous)`, with mem0 silently `add()`-ing every turn. *Why not now:* it puts mem0 **in the
+  critical inference hot path** (a mem0 outage breaks every agent call) and captures noisy raw turns
+  instead of curated, tagged, gate-able decisions — violating the standing rule that mem0 is a recall
+  complement, never load-bearing (git stays authoritative). The deterministic
+  `mem0_record_decision.py` writer is the better fit. Recorded here (with the exact enablement path)
+  so a future epic can adopt passive capture deliberately if the tradeoff ever becomes worth it.
 - **OpenHands via Portal/LiteLLM (Q7).** *Deferred because:* the greenfield path for now is
   "Hermes research → HumanLayer Linear ticket → Claude Code executes." Claude Code Max cannot back
   OpenHands (OAuth tokens blocked in third-party tools); pointing OpenHands at the Portal
