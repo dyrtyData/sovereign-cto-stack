@@ -526,21 +526,25 @@ decision) into `memories` so mem0 extracts/dedups/entity-links it natively.
   `scripts/diagnose_hermes_mem0_write.py`, which runs one loop with the helper disabled
   (`MEM0_RECORD_DECISION_DISABLE=1`) and reports a machine-readable verdict.
 
-  > **Recorded Q3 verdict (2026-06-28, this worktree):**
-  > `{"verdict": "INCONCLUSIVE", "collection": "memories", "user_id": "sovereign-cto",
-  > "reason": "nous portal inference unreachable at http://127.0.0.1:8645/v1 — start it with
-  > `hermes portal login`; without inference a 0-delta cannot be read as NO_NATIVE_WRITE",
-  > "baseline_rows": 4}`
+  > **Recorded Q3 verdict (2026-06-28, CONCLUSIVE):**
+  > `{"verdict": "NO_NATIVE_WRITE", "collection": "memories", "user_id": "sovereign-cto",
+  > "baseline_rows": 4, "post_rows": 4, "delta": 0, "loop_ran": true, "loop_rc": 0}`
   >
-  > The probe self-skips to `INCONCLUSIVE` until **three** prerequisites hold: the `hermes` binary on
-  > PATH (present), the `graphify-out/service-graph.html` input (now generated via
-  > `scripts/run_graphify.sh`), **and a reachable Nous Portal inference proxy** (`hermes portal login`,
-  > currently down). The Portal reachability guard was added deliberately: without inference the hero
-  > loop produces no decision, so a 0-row delta would be meaningless — emitting `NO_NATIVE_WRITE` in
-  > that state would be a **false negative**, so the probe refuses to guess. With all three present it
-  > emits `NATIVE_WRITE_OBSERVED` (bonus) or `NO_NATIVE_WRITE` (confirms the helper is required).
-  > Either way the deterministic helper stays load-bearing — the verdict only tells us whether native
-  > capture is a *complement*, never whether the slice works.
+  > Ran with all three prerequisites satisfied: the `hermes` binary on PATH, the
+  > `graphify-out/service-graph.html` input (generated via `scripts/run_graphify.sh`), and reachable
+  > Nous inference. **The closed-source `hermes-agent` binary does NOT write the `memories` collection
+  > on its own.** A full hero loop ran with our deterministic helper disabled (`rc=0`, 13 real tool
+  > calls incl. `query_cto_knowledge` + `save_issue`), yet `memories` stayed at 4 rows (delta +0). This
+  > empirically confirms design Q3: passive/native capture is unavailable for our architecture, so the
+  > deterministic `mem0_record_decision.py` helper is **REQUIRED**, not merely a complement.
+  >
+  > **Inference-path correction (learned while running this probe):** `hermes -p` talks DIRECTLY to the
+  > Nous remote API (`https://inference-api.nousresearch.com/v1`, provider `nous`) using the OAuth
+  > credential from `hermes portal login` — it does **not** route through the optional local
+  > `hermes proxy` on `:8645` (nothing in our loop does). The probe's reachability guard therefore
+  > checks the remote inference API, not `:8645`; a network/timeout failure there yields `INCONCLUSIVE`
+  > rather than a false `NO_NATIVE_WRITE`. (`hermes portal login` is one-shot OAuth onboarding — it
+  > authenticates the host and is not re-run per session; the credential persists in `~/.hermes`.)
 
 - **Q4 — `infer=True` (mem0's intended extraction), self-skipping to `infer=False` when Ollama is
   down.** The write feeds mem0 the whole turn so the extraction LLM pulls salient facts, dedups,

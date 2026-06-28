@@ -69,21 +69,29 @@ COLLECTION = os.environ.get("MEM0_MEMORIES_COLLECTION", "memories")
 USER_ID = os.environ.get("MEM0_MEMORIES_USER", "sovereign-cto")
 EMBED_DIMS = 384
 HERO_TIMEOUT = int(os.environ.get("DIAG_HERO_TIMEOUT", "150"))
-# The Nous Portal OpenAI-compatible inference proxy the hero loop's `hermes` call
-# routes through (hermes/config.yaml provider: nous; `hermes portal login` starts it).
-PORTAL_BASE = os.environ.get("NOUS_PORTAL_BASE", "http://127.0.0.1:8645/v1")
+# The inference endpoint the hero loop's `hermes -p` call actually uses. Per the
+# live `hermes portal info`, the agent talks DIRECTLY to the Nous remote API
+# (provider: nous) using the OAuth credential from `hermes portal login` — NOT the
+# optional local `hermes proxy` on :8645, which nothing in the loop routes through.
+INFERENCE_API = os.environ.get("NOUS_INFERENCE_API", "https://inference-api.nousresearch.com/v1")
 
 
-def _portal_reachable() -> bool:
-    """True if the Nous Portal inference proxy answers on /models.
+def _inference_reachable() -> bool:
+    """True if the Nous inference API answers at all (any HTTP status, incl. 401/403).
 
-    Without inference the hero loop produces no decision, so a delta of 0 would be
-    meaningless — guarding here prevents a FALSE `NO_NATIVE_WRITE` verdict."""
+    The hero loop needs inference to produce a decision; without it a 0-row delta is
+    meaningless, so guarding prevents a FALSE `NO_NATIVE_WRITE`. A 4xx means the
+    server answered (reachable) — only a network/timeout failure counts as down. We
+    do NOT require auth here: `hermes` holds the credential; we only prove the host
+    is reachable so the loop can run."""
+    import urllib.error
     import urllib.request
 
     try:
-        with urllib.request.urlopen(f"{PORTAL_BASE}/models", timeout=4) as r:
+        with urllib.request.urlopen(f"{INFERENCE_API}/models", timeout=6) as r:
             return r.status < 500
+    except urllib.error.HTTPError:
+        return True  # server responded (e.g. 401 unauthenticated) -> reachable
     except Exception:
         return False
 
@@ -139,13 +147,13 @@ def main() -> int:
         return _verdict("INCONCLUSIVE",
                         reason="graphify-out/service-graph.html missing — run scripts/run_graphify.sh first",
                         baseline_rows=before)
-    if not _portal_reachable():
+    if not _inference_reachable():
         # Inference is down: the hero loop cannot produce a decision, so a 0-delta
         # would NOT mean "no native write". Refuse to guess — stay INCONCLUSIVE.
         return _verdict("INCONCLUSIVE",
-                        reason=("nous portal inference unreachable at "
-                                f"{PORTAL_BASE} — start it with `hermes portal login`; "
-                                "without inference a 0-delta cannot be read as NO_NATIVE_WRITE"),
+                        reason=(f"nous inference API unreachable at {INFERENCE_API} — "
+                                "check network and `hermes portal status` (auth); without "
+                                "inference a 0-delta cannot be read as NO_NATIVE_WRITE"),
                         baseline_rows=before)
 
     # Run ONE hero loop with OUR deterministic write DISABLED, so any new `memories`
