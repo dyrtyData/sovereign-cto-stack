@@ -12,6 +12,26 @@ capture of autonomous runs.
 Anyone can `git clone` this repo and bring the stack up with `docker compose up` — there are
 **zero secrets committed**. You supply your own credentials in a local `.env` (see below).
 
+## Visual overview & report
+
+New here? Start with the visuals — they explain the architecture and the tech-debt hero loop
+faster than the prose below. All report artifacts live in [`docs/report/`](docs/report/).
+
+- 🎥 **Video overview** (NotebookLM) — narrated walkthrough of the stack:
+  [watch here](https://notebooklm.google.com/notebook/6a50df1d-0f96-4072-a1d0-1677cdb2e94e/artifact/3ada1f7b-cb84-430a-8c52-d3f7769a070a?utm_source=nlm_web_share&utm_medium=google_oo&utm_campaign=art_share_1&utm_content=&utm_smc=nlm_web_share_google_oo_art_share_1_)
+  *(the local `.mp4` renders are gitignored — too large for git)*
+- 🖼️ **Infographic** — the autonomous AI engineering-factory framework at a glance:
+  [`docs/report/Autonomous_AI_Engineering_Factory_Framework.png`](docs/report/Autonomous_AI_Engineering_Factory_Framework.png)
+- 🧠 **CTO mind map** — how the CTO functions map to the stack:
+  [`docs/report/CTO_Mind_Map.png`](docs/report/CTO_Mind_Map.png)
+- 📑 **Slide deck** — [PDF](docs/report/Sovereign_CTO_Stack.pdf) · [editable PPTX](docs/report/Sovereign_CTO_Stack.pptx)
+- 📝 **Engineering governance strategy** — the autonomous-agent integration write-up:
+  [`docs/report/Engineering_Governance_Strategy.md`](docs/report/Engineering_Governance_Strategy.md)
+
+![Autonomous AI engineering-factory framework — infographic](docs/report/Autonomous_AI_Engineering_Factory_Framework.png)
+
+![CTO mind map](docs/report/CTO_Mind_Map.png)
+
 ## Architecture (target)
 
 - **Hermes orchestrator** — boots, authenticates to Nous Portal, persists facts in mem0,

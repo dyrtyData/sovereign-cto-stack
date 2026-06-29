@@ -21,6 +21,12 @@ graphify-out/
 recordings/
 workspaces/
 
+# === Report video artifacts stay LOCAL (too large for git; linked from README) ===
+# The NotebookLM video overviews (50-60MB each) live only on disk + are linked from
+# README via their NotebookLM share URL. The PDF/PPTX/PNG report artifacts in
+# docs/report/ ARE tracked (they're small enough and render inline).
+docs/report/*.mp4
+
 # === Recorder persistent Chromium profile (GLO-14 P3 authenticated live-Linear ending) ===
 # A bind-mounted, PERSISTENT, AUTHENTICATED Chromium profile lets the OPTIONAL
 # TICKET_LIVE_URL=1 ending render the real logged-in Linear ticket. It holds a live
