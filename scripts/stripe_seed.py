@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """stripe_seed.py — seed a Stripe TEST-mode sandbox with real customers /
 subscriptions / invoices across ~3 monthly cohorts (some churned) so that
 genuine MRR / churn / cohort metrics can be computed by stripe_client.py.

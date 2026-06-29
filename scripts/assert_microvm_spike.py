@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_microvm_spike.py — the GLO-14 P4 MicroVM-spike gate (TOLERANT, design Q9 Option A).
 
 This is the falsifiable exit-0 contract for the host-orchestrator MicroVM confinement

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """linear_mcp.py — minimal Linear MCP (Streamable HTTP) client for verification.
 
 Used by scripts/assert_brownfield_ticket.py to read tickets back from Linear over

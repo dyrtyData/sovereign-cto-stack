@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_sonar_fusion.py — verify the Phase-4 (P3) DETECT+KEEP+JUDGMENT fusion.
 
 Two load-bearing assertions, in the repo's exit-0-on-pass shape:

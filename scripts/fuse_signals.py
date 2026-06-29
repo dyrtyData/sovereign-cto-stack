@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """fuse_signals.py — fuse the SonarQube DETECT signal onto the graphify KEEP signal.
 
 The tech-debt loop fuses two complementary static signals:

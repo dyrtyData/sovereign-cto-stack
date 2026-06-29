@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """file_fullbuild_ticket.py — create/update the comprehensive "full-build" Linear epic (Phase 5).
 
 This is the single ticket (design Q1) that captures the ENTIRE Sovereign CTO Stack vision —

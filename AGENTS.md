@@ -48,6 +48,21 @@ handoffs (`kanban_complete()` returns `summary` + `metadata`).
    the tracked `.githooks/pre-commit` hook — enable once per clone with
    `git config core.hooksPath .githooks`). Never stage secrets, symlink targets, or
    large binaries; the repo is public.
+9. **AGPLv3 attribution header on every source file.** This repo is licensed under the GNU
+   AGPL v3.0 (see `LICENSE`); the copyright holder is **dyrtyData**. AGPL §4–§5 only protect
+   copyright notices that are actually present in a file, so **every `.py`/`.sh` you create
+   under `scripts/`, `hermes/`, `egress/`, or `recorder/` MUST carry the 3-line SPDX header**
+   (after the shebang, before the PEP 723 block / docstring):
+   ```
+   # SPDX-License-Identifier: AGPL-3.0-or-later
+   # Copyright (C) 2026 dyrtyData
+   # Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+   ```
+   Don't hand-add it — run `python3 scripts/apply_license_headers.py` (idempotent; it inserts
+   the header into any missing file). The tracked `.githooks/pre-commit` hook **blocks the
+   commit** if a staged in-scope file lacks the header (`apply_license_headers.py --check
+   --staged`). This rule is load-bearing for the "any duplication credits the author" goal —
+   carry it into every subagent/implementer prompt.
 
 ## Memory
 
