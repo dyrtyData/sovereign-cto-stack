@@ -82,12 +82,30 @@ def _staged_in_scope() -> list[Path]:
 
 
 def has_header(path: Path) -> bool:
-    """True if the file already carries the SPDX header near the top."""
+    """True if the WORKING-TREE file carries the SPDX header near the top."""
     try:
         head = path.read_text(errors="replace").splitlines()[:10]
     except OSError:
         return False
     return any(MARKER in line for line in head)
+
+
+def index_has_header(rel: str) -> bool:
+    """True if the STAGED blob (git index) for `rel` carries the SPDX header.
+
+    The --staged gate MUST read the index, not the working tree: otherwise a
+    contributor could stage a header-less file, add the header to the working
+    copy without re-staging, and the hook would pass while the header-less blob
+    is what actually lands in the commit. `git show :<rel>` reads the staged blob.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "show", f":{rel}"],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+        ).stdout
+    except subprocess.CalledProcessError:
+        return False
+    return any(MARKER in line for line in out.splitlines()[:10])
 
 
 def apply_header(path: Path) -> bool:
@@ -111,7 +129,12 @@ def main(argv: list[str]) -> int:
     files = _staged_in_scope() if staged else _tracked_in_scope()
 
     if check:
-        missing = [p for p in files if not has_header(p)]
+        # In --staged mode, verify the STAGED BLOB (index), not the working tree,
+        # so the gate cannot be bypassed by a not-re-staged working-copy edit.
+        if staged:
+            missing = [p for p in files if not index_has_header(str(p.relative_to(REPO_ROOT)))]
+        else:
+            missing = [p for p in files if not has_header(p)]
         if missing:
             print("FAIL: these source files are missing the AGPLv3 attribution header:",
                   file=sys.stderr)
