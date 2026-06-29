@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 #
 # record_run.sh — capture an autonomous agent run to recordings/run_<ts>.mp4
 # (Phase 4 demo capture for the Hermes Hackathon).

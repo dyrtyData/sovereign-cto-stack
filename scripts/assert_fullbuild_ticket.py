@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_fullbuild_ticket.py — verify the comprehensive full-build epic (Phase 5).
 
 Asserts that Linear `find`/`list_issues` returns the single full-build ticket (design Q1) and

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_persistent_profile_wiring.py — the GLO-14 P3 persistent-profile smoke gate.
 
 The OPTIONAL authenticated live-Linear ending launches the recorder's Chromium WITH

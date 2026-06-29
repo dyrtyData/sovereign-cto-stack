@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 #
 # microvm_spike.sh — GLO-14 P4 host-orchestrator MicroVM confinement SPIKE (Q9 Option A).
 #

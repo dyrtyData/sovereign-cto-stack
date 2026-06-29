@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_product_ticket.py — verify the filed [Product] opportunity ticket.
 
 Phase-4 follow-up (TASK 2): after the PMF agent produces a market brief it must

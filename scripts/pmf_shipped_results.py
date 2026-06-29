@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """pmf_shipped_results.py — close the PMF North Star loop (GLO-14 P5 / design D-5 Option C).
 
 Every opportunity the PMF loop ranks into `recordings/pmf_ledger.json` is born

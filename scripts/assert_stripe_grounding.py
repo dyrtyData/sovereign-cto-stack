@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_stripe_grounding.py — verify the Phase-3 Stripe-grounded AARRR brief.
 
 Phase-3 (P2) load-bearing assertion (outline §"Automated Verification"): the

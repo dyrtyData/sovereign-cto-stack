@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """check_doc_links.py — internal markdown link check across docs/** (Phase 5).
 
 Validates that every *internal* (relative) link target referenced from a docs/*.md

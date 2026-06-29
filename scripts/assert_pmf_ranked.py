@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_pmf_ranked.py — verify the Phase-5 full PMF loop (RICE/ICE-ranked + feedback).
 
 Phase-5 (P4) load-bearing assertions (outline §"Automated Verification" + the

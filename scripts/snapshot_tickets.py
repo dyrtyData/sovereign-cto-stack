@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """snapshot_tickets.py — persist filed Linear tickets into git as tickets/<ID>.md.
 
 Phase-4 follow-up (TASK 3): git history is the authoritative decision record, but

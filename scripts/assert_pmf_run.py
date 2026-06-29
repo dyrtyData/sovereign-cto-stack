@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_pmf_run.py — verify the Phase-4 PMF run + Kanban handoff.
 
 Phase-4 automated checks (outline §"Automated Verification"):

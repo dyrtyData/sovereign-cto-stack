@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """build_showcase_video.py — assemble the comprehensive showcase montage (Phase 6).
 
 The submitted demo is a HYBRID MONTAGE (design Q6): live split-screen captures for

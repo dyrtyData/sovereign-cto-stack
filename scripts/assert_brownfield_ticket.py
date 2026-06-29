@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_brownfield_ticket.py — verify the filed [Brownfield] Linear ticket.
 
 Phase-3 automated check (outline §"Automated Verification"): read the newly

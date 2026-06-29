@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """render_ticket_card.py — render a local ticket snapshot to self-contained HTML.
 
 P0 ending fix (deferred from Phase 1). The recorded demo wants to END on the

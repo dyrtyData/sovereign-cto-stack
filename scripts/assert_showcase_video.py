@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_showcase_video.py — gate the Phase-6 showcase montage (exit-0-on-pass).
 
 The closeout deliverable (design Q6) is the hybrid-montage showcase video. This

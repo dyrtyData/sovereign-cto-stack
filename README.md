@@ -1,5 +1,7 @@
 # sovereign-cto-stack
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 A public-safe, version-controlled multi-agent "engineering factory" for an Apple Silicon
 host: a **Hermes** orchestrator (Nous Portal inference) with specialist profiles coordinating
 over a single-host Kanban board, persistent **mem0** memory, a textbook-grounded **CTO RAG
@@ -203,3 +205,15 @@ Complete every item before running later phases.
 > tracked `tickets/<ID>.md` (`scripts/snapshot_tickets.py` / `scripts/snapshot_after_run.sh`) so
 > the decision record lives in git. `docs/cto-functions.md` maps each CTO function to the corpus
 > texts that ground it.
+
+## License
+
+Copyright (C) 2026 [dyrtyData](https://github.com/dyrtyData).
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see
+[`LICENSE`](./LICENSE) for the full text. AGPL is a strong copyleft license chosen deliberately:
+you are free to use, study, modify, and redistribute this code, but **any distribution or
+modified version — including running it as a hosted/network service (SaaS) — must keep these
+same AGPL terms, preserve the copyright notices, and make the complete corresponding source
+available to its users** (AGPL §13). Per AGPL §4–§5, copies and derivative works must retain the
+`Copyright (C) 2026 dyrtyData` notices and state any changes made.

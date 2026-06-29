@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dyrtyData
+# Part of sovereign-cto-stack — licensed under the GNU AGPL v3.0; see LICENSE.
+
 """assert_closeout_ready.py — the GLO-14 Phase 7 D-6 closeout-boundary gate.
 
 This is the falsifiable exit-0 contract for "the full-epic scope is substantially actioned"
